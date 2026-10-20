@@ -34,7 +34,7 @@ the git history; section numbers in code comments refer to it).
 | M2F-a  | Seal Face Flatness v5: engines mahr-2 / roundpak-2 (skip first points, Flat/Convex/Concave at ± 0.25 HLB, ROUNDPAK radial taper and UPR harmonics, light-band gauge, lenient Mahr reading, drag and drop)                                     | under review                          |
 | M2F-B1 | Report profiles (Customer / Engineering), per-profile content selection, frozen record (revision 0) and controlled report documents (Issued / Superseded / Withdrawn)                                                                         | under review                          |
 | M2F-B2 | Result revisions: a final Result is corrected by opening revision N+1 with a reason; execution evidence can be corrected; documents of earlier revisions become Superseded                                                                    | under review                          |
-| FR-0   | Final Report: texts, included runs, generated summary table and one section per run from the frozen records; draft PDF; issued as R0, R1, … stored once                                                                                     | under review                          |
+| FR-0   | Final Report: texts, included runs, generated summary table and one section per run from the frozen records; draft PDF; issued as R0, R1, … stored once                                                                                       | under review                          |
 
 What works today:
 
