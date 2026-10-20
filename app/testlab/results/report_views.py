@@ -149,14 +149,16 @@ class DocumentDownloadView(View):
 
 
 class FinalReportView(View):
-    """The Engineering document of the latest final revision (M2E link: Download Final Report)."""
+    """The issued document of a profile — Engineering by default — of the latest final revision
+    (the Download Engineering / Customer Report links)."""
 
-    def get(self, request, run_pk):
+    def get(self, request, run_pk, profile="engineering"):
+        check_profile(profile)
         test_run = get_run(run_pk)
         result = get_object_or_404(TestResult, test_run=test_run, status=TestResult.Status.FINAL)
-        document = ReportDocument.objects.filter(revision=publication.latest_revision(result), profile="engineering",
+        document = ReportDocument.objects.filter(revision=publication.latest_revision(result), profile=profile,
                                                  status=ReportDocument.Status.ISSUED).first()  # fmt: skip
         if document is None:
-            raise Http404("No issued Engineering document.")
+            raise Http404(f"No issued {PROFILES[profile]} document.")
         return document_response(document)
 

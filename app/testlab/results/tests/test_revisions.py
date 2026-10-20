@@ -262,7 +262,7 @@ def test_revise_and_finalize_through_the_pages(client, user, final):
     assert response.status_code == 302 and response["Location"].endswith("#report")
     page = client.get(reverse("results:result", args=[run.pk])).content.decode()
     assert "Revision 1 in progress" in page and REASON in page and "Finalize revision 1" in page
-    assert "Open revision" not in page and "Download Final Report" not in page
+    assert "Open revision" not in page and "Download Engineering Report" not in page
     client.post(reverse("results:finalize", args=[run.pk]))
     page = client.get(reverse("results:result", args=[run.pk])).content.decode()
     assert "Final · revision 1" in page and "Open revision 2" in page and "2026RSD03TL-Run001-TRR-R1-E" in page

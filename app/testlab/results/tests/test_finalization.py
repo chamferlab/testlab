@@ -12,7 +12,7 @@ from testlab.documents.render import ChromiumTemplate
 from testlab.documents.tests.pdf_text import pdf_lines
 from testlab.execution.models import ManualLogEntry
 from testlab.projects.models import ProgramRequirement, TestProgram
-from testlab.results import finalization, records, requirements, seal_faces, services
+from testlab.results import finalization, publication, records, requirements, seal_faces, services
 from testlab.results.models import AcceptanceItem, Assessment, FinalResultError, ReportDocument, TestResult
 
 from .helpers import face_length, log, make_run
@@ -212,7 +212,24 @@ def test_finalize_through_the_page(client, user):
     response = client.post(reverse("results:finalize", args=[run.pk]))
     assert response.status_code == 302 and response["Location"].endswith("#report")
     page = client.get(reverse("results:result", args=[run.pk])).content.decode()
-    assert "Download Final Report" in page and "is final" in page
+    assert "Download Engineering Report" in page and "is final" in page
+
+
+def test_customer_report_is_downloaded_once_issued(client, user):
+    run, result = complete_result(user)
+    final = finalization.finalize(result, user)
+    client.force_login(user)
+    url = reverse("results:report_final_profile", args=[run.pk, "customer"])
+    assert client.get(url).status_code == 404
+    page = client.get(reverse("results:result", args=[run.pk])).content.decode()
+    assert "Issue Customer Report" in page and url not in page
+    document = publication.issue(final.revisions.get(), "customer", user)
+    page = client.get(reverse("results:result", args=[run.pk])).content.decode()
+    assert "Download Customer Report" in page and url in page
+    response = client.get(url)
+    assert response.status_code == 200 and response.content == publication.document_bytes(document)
+    assert response["Content-Disposition"] == 'attachment; filename="2026RSD03TL-Run001-TRR-R0-C.pdf"'
+    assert client.get(reverse("results:report_final_profile", args=[run.pk, "other"])).status_code == 404
 
 
 # --- a final Result cannot change ---------------------------------------------------------------

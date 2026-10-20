@@ -130,6 +130,8 @@ def render_result(request, test_run, result, **forms):
             "report_revision": revisions.latest(result) if result.is_final else None,
             "report_documents": list(ReportDocument.objects.filter(revision__result=result).order_by(
                 "profile", "revision__number", "issue")),
+            "customer_issued": result.is_final and ReportDocument.objects.filter(
+                revision=revisions.latest(result), profile="customer", status=ReportDocument.Status.ISSUED).exists(),
             "completeness": measurement_summary.completeness(components),
             "upload_form": forms.get("upload_form") or ImageUploadForm(components=components),
             "pictures": images.picture_groups(result, components),

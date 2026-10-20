@@ -49,6 +49,8 @@ urlpatterns = [
     path("runs/<int:run_pk>/result/report/details/", views.ReportDetailsView.as_view(), name="report_details"),
     path("runs/<int:run_pk>/result/report/finalize/", views.FinalizeView.as_view(), name="finalize"),
     path("runs/<int:run_pk>/result/report/final/", report_views.FinalReportView.as_view(), name="report_final"),
+    path("runs/<int:run_pk>/result/report/final/<str:profile>/", report_views.FinalReportView.as_view(),
+         name="report_final_profile"),
     path("runs/<int:run_pk>/result/report/revise/", views.ReviseView.as_view(), name="revise"),
     path("result/components/<int:pk>/observations/", views.ComponentObservationsView.as_view(),
          name="component_observations"),

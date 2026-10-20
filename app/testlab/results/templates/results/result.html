@@ -12,7 +12,12 @@
     </nav>
     {% if result.is_final %}
       <span class="hint">Finalized {{ result.finalized_at|date:"d-M-Y H:i" }} by {{ result.finalized_by|initials }}</span>
-      <a class="button btn-primary report-preview" href="{% url 'results:report_final' run.pk %}" title="The stored final Test Run Report (PDF)">Download Final Report</a>
+      <a class="button btn-primary report-preview" href="{% url 'results:report_final' run.pk %}" title="The stored Engineering Test Run Report (PDF)">Download Engineering Report</a>
+      {% if customer_issued %}
+        <a class="button btn-primary report-preview" href="{% url 'results:report_final_profile' run.pk 'customer' %}" title="The stored Customer Test Run Report (PDF)">Download Customer Report</a>
+      {% else %}
+        <a class="button report-preview" href="{% url 'results:report_contents' run.pk 'customer' %}#documents" title="Choose the Customer report contents, then issue it from the frozen record">Issue Customer Report…</a>
+      {% endif %}
     {% else %}
       <span class="hint">Last changed {{ result.updated_at|date:"d-M-Y H:i" }} by {{ result.updated_by|initials }}</span>
       <a class="button report-preview" href="{% url 'results:report_preview' run.pk %}" target="_blank" rel="noopener" title="Draft Test Run Report (PDF), generated from the current data">Preview Report</a>
