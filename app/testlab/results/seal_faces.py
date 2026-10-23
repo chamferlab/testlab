@@ -17,7 +17,7 @@ A Draft measurement is recalculated whenever its settings change; a
 reviewed one keeps its stored results. Reviewing a measurement makes it the
 reported one of its slot (component, stage, kind); earlier measurements of
 the slot stay on record and can be chosen again. Everything here refuses
-changes once the Result is no longer a Draft (finalization, not built yet).
+changes once the Result is no longer a Draft (testlab/locks.py).
 """
 
 import hashlib
@@ -28,6 +28,8 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils import timezone
+
+from testlab import locks
 
 from . import facemeasure
 from .facemeasure import CalculationError, InstrumentFileError, figures, mahr, roundpak
@@ -40,7 +42,6 @@ from .models import (
     MeasurementFile,
     RoundpakAnalysis,
     TestResult,
-    on_record,
 )
 
 Role = MeasurementFile.Role
@@ -75,7 +76,7 @@ class MeasurementError(Exception):
 
 def ensure_editable(result):
     if result.status != TestResult.Status.DRAFT:
-        raise MeasurementError("The Result is no longer a Draft: its measurements cannot change.")
+        raise MeasurementError(locks.final_result_message(result.test_run))
 
 
 def ensure_applicable(component, kind):
@@ -87,11 +88,9 @@ def ensure_applicable(component, kind):
 
 def ensure_not_on_record(measurement, action):
     """A measurement held by a final revision stays as it is while a later revision is in progress."""
-    if revision := on_record(measurement):
-        raise MeasurementError(
-            f"{measurement} is on record in final revision {revision.number} and cannot be {action}. Add the "
-            "corrected measurement as a new one and review it: it becomes the reported measurement of its slot."
-        )
+    if lock := locks.on_record_lock(measurement, action):
+        raise MeasurementError(f"{lock} Add the corrected measurement as a new one and review it: it becomes the "
+                               "reported measurement of its slot.")  # fmt: skip
 
 
 def ensure_draft(measurement):

@@ -8,12 +8,13 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views import View
 
+from testlab import locks
 from testlab.tcn.permissions import can_undo_log_import
 
 from .forms import LogImportUploadForm
 from .log_import import mapping, service
 from .models import ManualLogEntry, ManualLogImport
-from .views import get_run, recording_refusal, run_context
+from .views import get_run, run_context
 
 Status = ManualLogImport.Status
 
@@ -208,7 +209,7 @@ class LogImportDetailView(View):
         return render(request, self.template_name, {
             **batch_context(batch, "record"), **preview_context(batch),
             "can_undo": batch.status == Status.IMPORTED and can_undo_log_import(request.user)
-            and not recording_refusal(batch.test_run),
+            and not locks.result_refusal(batch.test_run),
         })  # fmt: skip
 
 

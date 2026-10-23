@@ -13,7 +13,7 @@ TestRun protect it (a draft TCN whose run holds evidence cannot be deleted).
 Whether evidence may be recorded for a run whose TCN is still a Draft is a
 lifecycle/authorization rule, deliberately not a model constraint: it is
 allowed during development and validation (intentional temporary policy) and
-will be refused in production (views.recording_refusal,
+will be refused in production (locks.result_refusal,
 TESTLAB_EXECUTION_REQUIRES_ISSUED_TCN).
 """
 

@@ -13,7 +13,7 @@ Enforced here, independent of any form or view:
 * only drafts can be edited or deleted. Issued, superseded and cancelled
   revisions are immutable: save, delete, QuerySet.update and
   QuerySet.delete are refused. Their RunSetup and seal positions are
-  guarded by signals (save and delete); QuerySet.update on those two
+  guarded by signals (save and delete, testlab/locks.py); QuerySet.update on those two
   tables bypasses signals and is not used for TCN setups.
 """
 
@@ -21,18 +21,19 @@ from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
 from django.db.models import Max, Q
-from django.db.models.signals import post_delete, pre_delete, pre_save
+from django.db.models.signals import post_delete, pre_delete
 from django.dispatch import receiver
 from django.utils import timezone
 
-from testlab.projects.models import AcceptanceRequirementFields, Project, ProgramRequirement, RunSetup, SealPosition
+from testlab.locks import Locked, tcn_lock
+from testlab.projects.models import AcceptanceRequirementFields, Project, ProgramRequirement, RunSetup
 
 
 class TcnRuleError(Exception):
     """A change the TCN domain rules do not allow."""
 
 
-class ImmutableTcnError(TcnRuleError):
+class ImmutableTcnError(TcnRuleError, Locked):
     """Attempt to change or delete an issued, superseded or cancelled TCN revision."""
 
 
@@ -347,8 +348,9 @@ class TcnRequirementChange(AcceptanceRequirementFields):
         tcn_ids = {self.tcn_id}
         if self.pk is not None:
             tcn_ids.update(TcnRequirementChange.objects.filter(pk=self.pk).values_list("tcn_id", flat=True))
-        if TcnRevision.objects.filter(pk__in=tcn_ids).exclude(status=TcnRevision.Status.DRAFT).exists():
-            raise ImmutableTcnError("This acceptance requirement change belongs to an issued TCN and cannot be changed.")
+        for tcn in TcnRevision.objects.filter(pk__in=tcn_ids):
+            if lock := tcn_lock(tcn):
+                raise ImmutableTcnError(f"This acceptance requirement change belongs to the TCN: {lock}")
 
     def save(self, *args, **kwargs):
         self._check_editable()
@@ -373,12 +375,9 @@ def _check_deletable(revisions):
         raise ImmutableTcnError(f"{issued.first()} has been issued and cannot be deleted (cancel it instead).")
 
 
-def _locked_setup_exists(setup_ids):
-    return TcnRevision.objects.filter(setup_id__in=setup_ids).exclude(status=TcnRevision.Status.DRAFT).exists()
-
-
 # The signal guards below are backstops for deletes that do not go through
-# TcnRevision.delete() or its QuerySet (e.g. a cascade). Raised inside
+# TcnRevision.delete() or its QuerySet (e.g. a cascade). The run setup and seal
+# positions of an issued TCN are guarded in testlab/locks.py. Raised inside
 # Django's delete transaction, they also abort the surrounding transaction.
 
 
@@ -393,21 +392,6 @@ def _delete_owned_records(sender, instance, **kwargs):
     # without a TCN: deleting the draft rev 0 removes the run too.
     RunSetup.objects.filter(pk=instance.setup_id).delete()
     TestRun.objects.filter(pk=instance.test_run_id, revisions__isnull=True).delete()
-
-
-@receiver([pre_save, pre_delete], sender=RunSetup)
-def _guard_issued_setup(sender, instance, **kwargs):
-    if instance.pk is not None and _locked_setup_exists([instance.pk]):
-        raise ImmutableTcnError("This run setup belongs to an issued TCN and cannot be changed.")
-
-
-@receiver([pre_save, pre_delete], sender=SealPosition)
-def _guard_issued_seal_position(sender, instance, **kwargs):
-    setup_ids = {instance.setup_id}
-    if instance.pk is not None:  # also the setup it is moved away from
-        setup_ids.update(SealPosition.objects.filter(pk=instance.pk).values_list("setup_id", flat=True))
-    if _locked_setup_exists(setup_ids):
-        raise ImmutableTcnError("This seal position belongs to an issued TCN and cannot be changed.")
 
 
 @receiver(pre_delete, sender=TcnRequirementChange)

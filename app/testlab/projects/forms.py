@@ -1,5 +1,7 @@
 from django import forms
 
+from testlab import locks
+
 from .arrangements import SealRole
 from .models import (
     REQUIREMENT_FACES,
@@ -23,7 +25,7 @@ class ProjectForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if self.instance.project_no_locked():
+        if locks.project_no_lock(self.instance):
             # V2: shown read-only; a disabled field ignores posted values.
             field = self.fields["project_no"]
             field.disabled = True

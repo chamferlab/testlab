@@ -6,6 +6,8 @@ from django.core.validators import RegexValidator
 from django.db import models, transaction
 from django.db.models import Q
 
+from testlab import locks
+
 from . import conditions
 from .arrangements import (
     Arrangement,
@@ -67,14 +69,8 @@ class Project(models.Model):
     class Meta:
         ordering = ["-project_no"]
 
-    PROJECT_NO_LOCKED = "The project number cannot be changed: a TCN of this project has been issued."
-
     def __str__(self):
         return self.project_no
-
-    def project_no_locked(self):
-        """V2: locked once any TCN of the project has been issued, whatever its later status."""
-        return self.pk is not None and self.test_runs.filter(revisions__issued_at__isnull=False).exists()
 
     def _project_no_changed(self):
         stored = Project.objects.filter(pk=self.pk).values_list("project_no", flat=True).first()
@@ -82,16 +78,16 @@ class Project(models.Model):
 
     def clean(self):
         super().clean()
-        if self._project_no_changed() and self.project_no_locked():
-            raise ValidationError({"project_no": self.PROJECT_NO_LOCKED})
+        if self._project_no_changed() and (lock := locks.project_no_lock(self)):
+            raise ValidationError({"project_no": lock})
 
     def save(self, *args, **kwargs):
         self.project_no = normalize_project_no(self.project_no)
         self.description = self.description.strip()
         self.customer = self.customer.strip()
         # V2 enforced here too, not only in the form: issued TCNs carry this number.
-        if self.pk is not None and self._project_no_changed() and self.project_no_locked():
-            raise ValidationError({"project_no": self.PROJECT_NO_LOCKED})
+        if self.pk is not None and self._project_no_changed() and (lock := locks.project_no_lock(self)):
+            raise ValidationError({"project_no": lock})
         with transaction.atomic():
             if self.default_setup_id is None:
                 self.default_setup = RunSetup.create_with_positions()

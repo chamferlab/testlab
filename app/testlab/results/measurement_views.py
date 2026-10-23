@@ -16,7 +16,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views import View
 
-from testlab.execution.views import result_refusal, run_context
+from testlab import locks
+from testlab.execution.views import run_context
 
 from . import measurement_summary, seal_faces
 from .inspection import MeasurementKind, Stage
@@ -192,7 +193,7 @@ class MeasurementView(View):
             "measurement": measurement, "component": component, "analysis": measurement.analysis,
             "settings_form": form, "remark_form": RemarkForm(measurement=measurement),
             "figures": figures, "figure_error": error, "files": list(measurement.files.all()),
-            "siblings": siblings, "editable": not result_refusal(component.result.test_run),
+            "siblings": siblings, "editable": not locks.result_refusal(component.result.test_run),
             "status": measurement_summary.slot_status(component, measurement.kind, measurement.stage),
         }  # fmt: skip
         return render(request, self.template_name, context)

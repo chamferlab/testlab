@@ -27,6 +27,8 @@ from django.db import transaction
 from django.utils import timezone
 from PIL import Image, ImageOps, UnidentifiedImageError
 
+from testlab import locks
+
 from .models import ProjectDrawing
 
 Kind = ProjectDrawing.Kind
@@ -170,24 +172,10 @@ def pictures(drawing, max_px=2400, max_pages=None):
     return found
 
 
-def delete_refusal(drawing):
-    """Why this drawing cannot be deleted, or None."""
-    from testlab.reports.models import FinalReportDocument
-
-    if current(drawing.project, drawing.kind) != drawing:
-        return "Only the current drawing can be deleted; earlier drawings are kept as its history."
-    # The current drawing is in every Final Report issued since it was uploaded (its appendices).
-    issued = FinalReportDocument.objects.filter(report__project=drawing.project, issued_at__gte=drawing.uploaded_at)
-    if issued.exists():
-        return (f"This drawing is in the issued Final Report {issued.order_by('-issued_at').first().identity}: "
-                "upload a new drawing instead; this one is kept as its history.")
-    return None
-
-
 def delete_drawing(drawing):
     """Remove the current drawing (a wrong upload): the record, the file and its display copy."""
-    if refusal := delete_refusal(drawing):
-        raise DrawingUploadError(refusal)
+    if lock := locks.drawing_lock(drawing):
+        raise DrawingUploadError(lock)
     storage = _storage()
     names = [drawing.file.name, drawing.preview_file]
     with transaction.atomic():

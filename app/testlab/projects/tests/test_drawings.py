@@ -7,6 +7,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from PIL import Image
 
+from testlab import locks
 from testlab.projects import drawings
 from testlab.projects.models import ProjectDrawing
 
@@ -123,7 +124,7 @@ def test_drawing_in_an_issued_final_report_cannot_be_deleted(project, user):
     with pytest.raises(drawings.DrawingUploadError, match=f"issued Final Report {project.project_no}R-R0"):
         drawings.delete_drawing(drawing)
     newer = drawings.add_drawing(project, "pid", upload("p2.pdf", PDF), user, "P-100", "B")
-    assert drawings.delete_refusal(newer) is None  # issued before it was uploaded
+    assert locks.drawing_lock(newer) == ""  # issued before it was uploaded
 
 
 def test_missing_preview_rebuilt(project, user, file_storage):
@@ -181,7 +182,7 @@ def test_delete_view(logged_in, project, user):
     first = drawings.add_drawing(project, "tester", upload("a.pdf", PDF), user, "F1", "1")
     drawings.add_drawing(project, "tester", upload("b.pdf", PDF), user, "F1", "2")
     response = logged_in.post(reverse("projects:drawing_delete", args=[first.pk]), follow=True)
-    assert message_texts(response) == [drawings.delete_refusal(first)]
+    assert message_texts(response) == [locks.drawing_lock(first)]
     current = drawings.current(project, "tester")
     response = logged_in.post(reverse("projects:drawing_delete", args=[current.pk]))
     assert message_texts(response) == ["Tester drawing F1 rev 2 deleted."]

@@ -237,7 +237,7 @@ def test_nothing_changes_once_the_result_is_no_longer_a_draft(result, user):
     m.component.result = result
     for action in (lambda: seal_faces.review(m, user), lambda: seal_faces.delete_measurement(m, user),
                    lambda: seal_faces.update_roundpak(m, roundpak.Settings(), user)):  # fmt: skip
-        with pytest.raises(seal_faces.MeasurementError, match="no longer a Draft"):
+        with pytest.raises(seal_faces.MeasurementError, match="is final"):
             action()
 
 

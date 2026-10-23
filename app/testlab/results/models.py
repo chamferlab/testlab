@@ -32,8 +32,8 @@ Lifecycle: Draft → Final (finalization.py). Final means complete and
 controlled, not passed: the record (requirements with their sources,
 evidence, assessments) is frozen as a ResultRevision, the Engineering report
 is issued from it, and the Result, its children and the run's execution
-evidence can no longer change (guards below; result_refusal and
-recording_refusal for the pages).
+evidence can no longer change (testlab/locks.py: result_lock for the pages
+and the backstops).
 
 Revision (M2F-B2, revisions.py): a final Result is corrected by opening the
 next revision with a reason. The Result is a Draft again (revision N in
@@ -48,7 +48,7 @@ or left out of the report.
 A Result may exist while the run's TCN is a Draft — intentional
 development-phase policy; production will refuse it through the same
 lifecycle/authorization rule as the manual log
-(execution.views.result_refusal, TESTLAB_EXECUTION_REQUIRES_ISSUED_TCN),
+(locks.result_refusal, TESTLAB_EXECUTION_REQUIRES_ISSUED_TCN),
 not through these models.
 """
 
@@ -58,14 +58,10 @@ from django.db.models import Q
 from django.db.models.signals import pre_delete, pre_save
 from django.dispatch import receiver
 
-from testlab.execution.models import (
-    DcsDataset,
-    DcsRunningDetermination,
-    ManualLogEntry,
-    ManualLogImport,
-    ManualLogImportRow,
-    ManualMeasurement,
-)
+from testlab import locks
+from testlab.locks import Locked
+
+from testlab.execution.models import DcsDataset
 from testlab.projects.arrangements import SealRole
 from testlab.projects.models import ProgramRequirement, RequirementBasis, RequirementComparison
 from testlab.tcn.models import TcnRequirementChange, TcnRevision, TestRun
@@ -161,19 +157,17 @@ class TestResult(models.Model):
         return self.status == self.Status.DRAFT and self.revision_opened_at is not None
 
     def save(self, *args, **kwargs):
-        if self.pk is not None:
-            stored = TestResult.objects.filter(pk=self.pk).values_list("status", flat=True).first()
-            if stored == self.Status.FINAL:
-                raise FinalResultError(f"{self} is final and cannot be changed.")
+        if self.pk is not None and (lock := locks.result_lock(self.test_run)):
+            raise FinalResultError(lock)
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
-        if TestResult.objects.filter(pk=self.pk, status=self.Status.FINAL).exists():
-            raise FinalResultError(f"{self} is final and cannot be deleted.")
+        if lock := locks.result_lock(self.test_run):
+            raise FinalResultError(lock)
         return super().delete(*args, **kwargs)
 
 
-class FinalResultError(Exception):
+class FinalResultError(Locked):
     """Attempt to change a final Result, its evidence or the run's execution evidence."""
 
 
@@ -876,105 +870,5 @@ def _guard_document(sender, instance, update_fields=None, **kwargs):
                                    "withdrawn, and nothing else of it changes.")  # fmt: skip
 
 
-# ---- A final Result cannot change -------------------------------------------------------------
-# Backstops for every write path (views refuse earlier with a message). QuerySet.update bypasses
-# signals and is used only for Draft data (seal_faces, plots, images reorder).
-
-
-def _result_ids(sender, instance):
-    if sender is TestResult:
-        return []
-    if sender in (ResultComponent, ResultImage, ResultPlot, AcceptanceItem):
-        return [instance.result_id]
-    if sender is FaceMeasurement:
-        return list(ResultComponent.objects.filter(pk=instance.component_id).values_list("result_id", flat=True))
-    measurement_id = instance.measurement_id  # files, figures, analysis rows
-    return list(FaceMeasurement.objects.filter(pk=measurement_id).values_list("component__result_id", flat=True))
-
-
-GUARDED = [ResultComponent, ResultImage, ResultPlot, AcceptanceItem, FaceMeasurement, MeasurementFile,
-           MeasurementFigure, DimensionalReading, MahrAnalysis, RoundpakAnalysis]  # fmt: skip
-
-
-def _guard_final_result(sender, instance, **kwargs):
-    ids = _result_ids(sender, instance)
-    if ids and TestResult.objects.filter(pk__in=ids, status=TestResult.Status.FINAL).exists():
-        raise FinalResultError("The Result is final: its measurements, pictures, plots and assessments cannot change.")
-
-
-for _model in GUARDED:
-    receiver([pre_save, pre_delete], sender=_model, dispatch_uid=f"final_result_{_model.__name__}")(
-        _guard_final_result
-    )
-
-
-def _guard_final_run_evidence(sender, instance, update_fields=None, **kwargs):
-    """The manual log and DCS data (with their running intervals) of a run with a final Result are part of
-    that record, and so are the manual-log imports (M2F) that produced its entries. A revision in progress
-    opens them again with the rest of the Result: each final revision holds its own frozen copy."""
-    if sender is DcsDataset and update_fields is not None and set(update_fields) <= {"columns_file"}:
-        return  # the derived column cache may be rebuilt from the unchanged raw file
-    if sender is ManualMeasurement:
-        run_ids = ManualLogEntry.objects.filter(pk=instance.entry_id).values_list("test_run_id", flat=True)
-    elif sender is ManualLogImportRow:
-        run_ids = ManualLogImport.objects.filter(pk=instance.batch_id).values_list("test_run_id", flat=True)
-    elif sender is DcsRunningDetermination:
-        run_ids = DcsDataset.objects.filter(pk=instance.dataset_id).values_list("test_run_id", flat=True)
-    else:
-        run_ids = [instance.test_run_id]
-    if TestResult.objects.filter(status=TestResult.Status.FINAL, test_run_id__in=list(run_ids)).exists():
-        raise FinalResultError("The run's Result is final: its manual log and DCS data cannot change.")
-
-
-for _model in (ManualLogEntry, ManualMeasurement, DcsDataset, DcsRunningDetermination, ManualLogImport,
-               ManualLogImportRow):
-    receiver([pre_save, pre_delete], sender=_model, dispatch_uid=f"final_run_{_model.__name__}")(
-        _guard_final_run_evidence
-    )
-
-
-# ---- What a final revision holds is never deleted ------------------------------------------------
-# While a later revision is in progress the Result is a Draft again, but the pictures, plots and
-# measurements (with their instrument files) that were on record when a revision was finalized stay:
-# a measurement is superseded by a new one, a picture or plot is left out of the report.
-
-
-def on_record_in(result_id, since):
-    """The latest final revision of the Result finalized after `since` (when the item was added), or None."""
-    if result_id is None or since is None:
-        return None
-    return ResultRevision.objects.filter(result_id=result_id, finalized_at__gte=since).order_by("-number").first()
-
-
-def on_record(instance):
-    """The latest final revision that holds the picture, plot, measurement or measurement file, or None."""
-    if isinstance(instance, ResultImage):
-        return on_record_in(instance.result_id, instance.uploaded_at)
-    if isinstance(instance, ResultPlot):
-        return on_record_in(instance.result_id, instance.created_at)
-    if isinstance(instance, MeasurementFile):
-        instance = FaceMeasurement.objects.filter(pk=instance.measurement_id).first()
-    if instance is None:
-        return None
-    result_id = ResultComponent.objects.filter(pk=instance.component_id).values_list("result_id", flat=True).first()
-    return on_record_in(result_id, instance.created_at)
-
-
-def _guard_revision_evidence(sender, instance, **kwargs):
-    if revision := on_record(instance):
-        raise FinalResultError(f"{instance} is on record in final revision {revision.number} and cannot be deleted.")
-
-
-for _model in (ResultImage, ResultPlot, FaceMeasurement, MeasurementFile):
-    receiver(pre_delete, sender=_model, dispatch_uid=f"revision_evidence_{_model.__name__}")(_guard_revision_evidence)
-
-
-@receiver(pre_save, sender=FaceMeasurement, dispatch_uid="revision_evidence_reopen")
-def _guard_revision_measurement(sender, instance, **kwargs):
-    """A reviewed measurement on record in a final revision is not reopened: its results stay as reviewed."""
-    if instance.pk is None or instance.status == FaceMeasurement.Status.REVIEWED:
-        return
-    if FaceMeasurement.objects.filter(pk=instance.pk, status=FaceMeasurement.Status.REVIEWED).exists():
-        if revision := on_record(instance):
-            raise FinalResultError(f"{instance} is on record in final revision {revision.number} and cannot be "
-                                   "reopened.")  # fmt: skip
+# The Result, its parts and the run's execution evidence are locked while the Result is Final, and what a
+# final revision holds is never deleted: testlab/locks.py (backstops connected in ResultsConfig.ready).

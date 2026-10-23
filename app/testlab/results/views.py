@@ -4,7 +4,7 @@
 
 Each section saves on its own and returns to its place on the page, so the
 engineer never fills one enormous form. Every change goes through the same
-lifecycle/authorization check (result_refusal), which refuses every change
+lifecycle/authorization check (locks.result_refusal), which refuses every change
 once the Result is final — until a revision is opened (M2F-B2), which makes
 the Result a Draft again, its manual log and DCS data included. The
 Report section previews the Draft report, lists what blocks finalization,
@@ -21,7 +21,8 @@ from django.urls import reverse
 from django.views import View
 
 from testlab.execution import manual_log
-from testlab.execution.views import get_dataset, get_run, result_refusal, run_context
+from testlab import locks
+from testlab.execution.views import get_dataset, get_run, run_context
 from testlab.documents.report_profiles import PROFILES
 from testlab.tcn.permissions import can_finalize_result, can_revise_result
 
@@ -73,7 +74,7 @@ def section_url(test_run, section):
 
 def refused(request, test_run, section="summary"):
     """Redirect with the reason when the run's Result may not be changed (yet, or any more), else None."""
-    if refusal := result_refusal(test_run):
+    if refusal := locks.result_refusal(test_run):
         messages.error(request, refusal)
         return redirect(section_url(test_run, section))
     return None
@@ -527,7 +528,7 @@ class NarrativeView(ResultSectionView):
 
 def plot_refusal(test_run):
     """JSON refusal for the DCS viewer, or None."""
-    if refusal := result_refusal(test_run):
+    if refusal := locks.result_refusal(test_run):
         return JsonResponse({"error": refusal}, status=403)
     return None
 

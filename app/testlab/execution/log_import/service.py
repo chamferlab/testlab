@@ -11,7 +11,7 @@
     discard()         a batch never imported: remove it and its stored file
 
 Every write is refused while the run's evidence is closed (a final Result;
-in production a TCN not yet issued): views.recording_refusal, with the
+in production a TCN not yet issued): locks.result_refusal, with the
 model guards of results.models as the backstop.
 """
 
@@ -24,6 +24,7 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils import timezone
 
+from testlab import locks
 from testlab.tcn.permissions import can_undo_log_import
 
 from ..models import ManualLogEntry, ManualLogImport, ManualLogImportRow, ManualMeasurement
@@ -47,9 +48,7 @@ class StaleImport(LogImportError):
 
 
 def _refusal(test_run):
-    from ..views import recording_refusal  # the single lifecycle check of execution evidence
-
-    return recording_refusal(test_run)
+    return locks.result_refusal(test_run)  # the lock and policy of execution evidence
 
 
 def _safe_name(name):

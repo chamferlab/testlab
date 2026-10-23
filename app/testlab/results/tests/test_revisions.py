@@ -16,7 +16,7 @@ from django.urls import reverse
 from testlab.documents.tests.pdf_text import pdf_lines
 from testlab.documents.tests.report_data import dual_run, picture
 from testlab.execution.models import ManualLogEntry
-from testlab.execution.views import recording_refusal, result_refusal
+from testlab.locks import result_refusal
 from testlab.results import finalization, images, plots, publication, records, revisions, seal_faces
 from testlab.results.models import FaceMeasurement, FinalResultError, ReportDocument, ResultImage, TestResult
 
@@ -87,7 +87,7 @@ def test_opening_changes_no_record_and_no_document(user, final):
 
 def test_the_result_and_the_execution_evidence_can_change(client, user, revising):
     run, result = revising
-    assert result_refusal(run) == "" and recording_refusal(run) == ""
+    assert result_refusal(run) == ""
     client.force_login(user)
     client.post(reverse("results:narrative", args=[run.pk]),
                 {"observations": "", "conclusion": "Corrected conclusion.", "recommendation": ""})  # fmt: skip
@@ -109,7 +109,7 @@ def test_corrected_evidence_is_in_the_next_revision_only_and_locked_again(user, 
     assert records.read_record(again.revisions.get(number=0)) == before
     assert "Gauge re-read" not in str(before)
     assert "Gauge re-read" in str(records.read_record(again.revisions.get(number=1)))
-    assert "is final" in recording_refusal(run)
+    assert "is final" in result_refusal(run)
     with pytest.raises(FinalResultError, match="manual log and DCS data cannot change"), transaction.atomic():
         ManualLogEntry.objects.filter(test_run=run).first().delete()
 

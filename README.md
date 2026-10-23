@@ -449,6 +449,7 @@ app/
 └── testlab/
     ├── templates/              base layout, login
     ├── static/testlab/         CSS, dcs_plot.js; static/vendor/plotly/ (local Plotly, no CDN)
+    ├── locks.py                every edit lock in one place: what locks what, page messages and backstops
     ├── accounts/               registration, email login backend, user admin with approval
     ├── projects/
     │   ├── models.py           Project, RunSetup, SealPosition; TestProgram, ProgramRequirement (M2E); ProjectDrawing
@@ -549,7 +550,7 @@ and the Test Result are intentionally allowed while the run's TCN is still a Dra
 missing validation. TODO for controlled production use: set
 `TESTLAB_EXECUTION_REQUIRES_ISSUED_TCN=1` (Issued TCN → execution permitted).
 The rule is a lifecycle/authorization check in
-`app/testlab/execution/views.py` (`recording_refusal`); the ManualLogEntry,
+`app/testlab/locks.py` (`result_refusal`); the ManualLogEntry,
 DcsDataset, TestResult and TestRun models need no change.
 
 Production runs one central Django application with **PostgreSQL**

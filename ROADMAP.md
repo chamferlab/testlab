@@ -75,7 +75,7 @@ Then, in no fixed order:
 |---|---|---|
 | Requirements flow one way, Program → TCN → Result, instead of being synced from the Result side | Medium | `results/requirements.py`, Test Program, TCN requirement changes |
 | One change log for the whole app (who changed what, when) | Medium | New table, hooked into every save |
-| Locks in one place instead of per-table checks | Small | `results/models.py`, `tcn/models.py` |
+| Locks in one place instead of per-table checks — **done 2026-10-23**: `testlab/locks.py` holds every edit lock (what locks what, the page messages and the backstops); the Result and the run's evidence share one message | Small | `results/models.py`, `tcn/models.py` |
 | Backup of `data/` to another disk, needed once the app holds records that must be kept | Small | Run script or a scheduled job |
 | "On record" from an explicit list of what each revision froze, instead of by time added | Small | `results/models.py`, `results/records.py` |
 | Tester drawing and system P&ID in the Project Defaults (below) — **built 2026-10-17; in the Final Report appendices 2026-10-23, under review** | Small | `projects/` model and Project Defaults screen |

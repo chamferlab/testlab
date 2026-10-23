@@ -2,7 +2,6 @@
 
 from datetime import datetime
 
-from django.conf import settings
 from django.contrib import messages
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -10,6 +9,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views import View
 
+from testlab import locks
 from testlab.tcn.models import TestRun
 
 from . import datasets, manual_log, running_intervals, signal_mapping
@@ -22,54 +22,17 @@ def get_run(pk):
 
 
 def run_context(test_run, tab):
-    """Context of a run page. `recording_refused` is the refusal of what the tab edits: the Result on the
-    Result tab, the execution evidence elsewhere; `result_refused` is always that of the Result."""
-    result_refused = result_refusal(test_run)
+    """Context of a run page. The Result and the execution evidence are locked together (locks.result_lock):
+    `recording_refused` (what the tab edits) and `result_refused` are the same refusal."""
+    refused = locks.result_refusal(test_run)
     return {
         "run": test_run,
         "project": test_run.project,
         "tcn": test_run.current_revision(),
         "tab": tab,
-        "recording_refused": result_refused if tab == "result" else recording_refusal(test_run),
-        "result_refused": result_refused,
+        "recording_refused": refused,
+        "result_refused": refused,
     }
-
-
-def _tcn_refusal(test_run):
-    """Intentional temporary policy: during development and validation evidence may be recorded for a
-    Draft TCN (TESTLAB_EXECUTION_REQUIRES_ISSUED_TCN off, the default). TODO(production): switch the
-    setting on so that only an issued TCN permits execution. The models stay as they are."""
-    if settings.TESTLAB_EXECUTION_REQUIRES_ISSUED_TCN and not test_run.has_issued_revision():
-        return f"TCN{test_run.display_no} has not been issued yet: readings and DCS data are recorded once it is issued."
-    return ""
-
-
-def recording_refusal(test_run):
-    """Why execution evidence (manual log, DCS data) cannot be recorded or changed for the run, or "".
-
-    The single lifecycle/authorization check for recording execution evidence. A final Result closes
-    the run's evidence; opening a revision of the Result (M2F-B2) opens it again with the rest of the
-    Result. Earlier revisions keep their own frozen copy of it, so a correction never changes them.
-    """
-    from testlab.results.models import TestResult  # the Result app builds on this one
-
-    result = TestResult.objects.filter(test_run=test_run).first()
-    if result is not None and result.is_final:
-        return (f"The Result of Run {test_run.display_no} is final: its manual log, DCS data, measurements and "
-                "assessments are part of the controlled record and cannot change.")  # fmt: skip
-    return _tcn_refusal(test_run)
-
-
-def result_refusal(test_run):
-    """Why the Result of the run (measurements, pictures, plots, assessments, conclusion) cannot be
-    changed, or "". Final: not until a revision is opened; a revision in progress is a Draft again."""
-    from testlab.results.models import TestResult
-
-    if TestResult.objects.filter(test_run=test_run, status=TestResult.Status.FINAL).exists():
-        return (f"The Result of Run {test_run.display_no} is final: its manual log, DCS data, measurements and "
-                "assessments are part of the controlled record and cannot change. A correction is made by "
-                "opening a revision (Report section).")  # fmt: skip
-    return _tcn_refusal(test_run)
 
 
 class ManualLogView(View):
@@ -83,8 +46,8 @@ class ManualLogView(View):
 
     def post(self, request, run_pk):
         test_run = get_run(run_pk)
-        if recording_refusal(test_run):
-            messages.error(request, recording_refusal(test_run))
+        if locks.result_refusal(test_run):
+            messages.error(request, locks.result_refusal(test_run))
             return redirect("execution:log", test_run.pk)
         entries = list(test_run.manual_log_entries.prefetch_related("measurements"))
         columns = manual_log.log_columns(test_run, entries)
@@ -153,7 +116,7 @@ class EntryEditView(EntryMixin, View):
 
     def post(self, request, pk):
         entry = self.get_entry(pk)
-        if refusal := recording_refusal(entry.test_run):
+        if refusal := locks.result_refusal(entry.test_run):
             messages.error(request, refusal)
             return redirect("execution:log", entry.test_run.pk)
         columns = manual_log.log_columns(entry.test_run, [entry])
@@ -187,7 +150,7 @@ class EntryDeleteView(EntryMixin, View):
     def post(self, request, pk):
         entry = self.get_entry(pk)
         run_pk = entry.test_run.pk
-        if refusal := recording_refusal(entry.test_run):
+        if refusal := locks.result_refusal(entry.test_run):
             messages.error(request, refusal)
             return redirect("execution:log", run_pk)
         when = f"{entry.observed_at:%d-%b-%Y %H:%M}"
@@ -206,8 +169,8 @@ class DcsListView(View):
 
     def post(self, request, run_pk):
         test_run = get_run(run_pk)
-        if recording_refusal(test_run):
-            messages.error(request, recording_refusal(test_run))
+        if locks.result_refusal(test_run):
+            messages.error(request, locks.result_refusal(test_run))
             return redirect("execution:dcs", test_run.pk)
         form = DcsUploadForm(request.POST, request.FILES)
         if form.is_valid():
@@ -241,7 +204,7 @@ class DcsDetailView(View):
     def post(self, request, pk):
         """Review the signal mapping: mapping_<column> = parameter code, unit_<column> = confirmed."""
         dataset = get_dataset(pk)
-        if refusal := recording_refusal(dataset.test_run):
+        if refusal := locks.result_refusal(dataset.test_run):
             messages.error(request, refusal)
             return redirect("execution:dcs_detail", dataset.pk)
         chosen, confirmed = {}, set()
@@ -407,7 +370,7 @@ class DcsRunningView(View):
     def post(self, request, pk):
         dataset = get_dataset(pk)
         target = reverse("execution:dcs_detail", args=[dataset.pk]) + "#running"
-        if refusal := recording_refusal(dataset.test_run):
+        if refusal := locks.result_refusal(dataset.test_run):
             messages.error(request, refusal)
             return redirect(target)
         action, shown = request.POST.get("action"), request.POST.get("determination", "")
