@@ -16,8 +16,7 @@ Finalization checks (blocking_issues), each with a link to its section:
 * the engineer has written the conclusion;
 * the report has a responsible engineer (Prepared by).
 
-Then, in one transaction (finalize): the requirements are brought in step
-a last time; the complete record context is built with the final marking
+Then, in one transaction (finalize): the complete record context is built with the final marking
 and frozen as Result revision N — 0 the first time, the next number for a
 revision in progress (records.py: the record file and a copy of every
 picture and plot it shows, each with its SHA-256); the issued documents of
@@ -112,8 +111,7 @@ def notices(result, found, items):
 
 
 def check(result, user):
-    """(issues, notices, evaluations) for the Result as it is now (after syncing the requirements)."""
-    requirements.sync_requirements(result, user)
+    """(issues, notices, evaluations) for the Result as it is now."""
     found = evidence.collect(result.test_run, result)
     items = list(result.acceptance_items.select_related("component"))
     evaluations = acceptance.evaluate_all(

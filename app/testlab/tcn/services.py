@@ -20,7 +20,9 @@ from testlab.documents.render import tcn_template
 from testlab.documents.tcn_context import build_tcn_context, tcn_file_name
 from testlab.projects.arrangements import SealRole
 
+from . import requirements
 from .models import ImmutableTcnError, TcnRevision, TcnRuleError, TestRun
+from .signals import tcn_issued
 
 RUN_NUMBER_USED = "Run number already used!"
 
@@ -153,9 +155,11 @@ def issue_tcn(tcn, expected_row_version, user):
     In one transaction: V11 check on the saved draft, render the PDF without
     the draft marking (from the TCN document template), store it
     (refused if the file exists, V15), store the SHA-256 of the stored PDF
-    and of the template and the render context, set issued_at/issued_by (the
-    user performing the issue) and supersede the previously issued revision
-    of the run. On any failure — including a failed PDF conversion — nothing
+    and of the template and the render context, freeze the acceptance
+    requirements in force (requirements.freeze), set issued_at/issued_by (the
+    user performing the issue), supersede the previously issued revision
+    of the run and pass the requirements on to the run's Draft Result
+    (signals.tcn_issued). On any failure — including a failed PDF conversion — nothing
     is kept: the TCN stays a draft and a file already written is removed.
     """
     storage = TcnRevision._meta.get_field("issued_document").storage
@@ -194,8 +198,10 @@ def issue_tcn(tcn, expected_row_version, user):
                 revision.updated_by = user
                 revision.save()
 
+            issued_at = timezone.now()
+            requirements.freeze(tcn, issued_at)  # while still a draft: the requirements are locked with it
             tcn.status = TcnRevision.Status.ISSUED
-            tcn.issued_at = timezone.now()
+            tcn.issued_at = issued_at
             tcn.issued_by = user
             tcn.issued_document.name = written
             tcn.issued_document_sha256 = hashlib.sha256(content).hexdigest()
@@ -203,6 +209,7 @@ def issue_tcn(tcn, expected_row_version, user):
             tcn.issued_snapshot = context
             tcn.updated_by = user
             tcn.save()
+            tcn_issued.send(sender=TcnRevision, tcn=tcn, user=user)
     except BaseException:
         if written is not None:
             storage.delete(written)

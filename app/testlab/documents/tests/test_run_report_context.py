@@ -248,7 +248,7 @@ def test_acceptance_records_with_sources_engineer_and_calculated_assessments(con
     ]  # fmt: skip
     ib, ob, duration = rows[0], rows[1], rows[2]
     assert (ib["actual"], ib["label"], ib["by"]) == ("6.0 ml/h", "Pass", "calculated")
-    assert ib["requirement_source"] == "Test Program TP-2026-03 rev B P1"
+    assert ib["requirement_source"] == "Test Program TP-2026-03 rev B P1 (TCN not issued yet)"  # a draft TCN
     assert (duration["actual"], duration["label"], duration["by"]) == ("36.00 h", "Fail", "calculated")
     assert rows[3]["requirement_source"] == "entered on the Test Result"
     rows = {a["criterion"]: a for a in rows}

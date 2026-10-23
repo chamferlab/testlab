@@ -97,12 +97,15 @@ def test_not_assessed_requirement_from_the_program_blocks(user):
     program = TestProgram.objects.create(project=run.project, updated_by=user)
     ProgramRequirement.objects.create(program=program, number=1, criterion="Test duration", basis="running_hours",
                                       comparison=">=", limit=Decimal("100"), unit="h", updated_by=user)  # fmt: skip
+    assert not result.acceptance_items.filter(criterion="Test duration").exists()  # taken at set moments only
+    requirements.sync_requirements(result, user)  # as when the Result is created, provisional: the TCN is a draft
     # 24 running h of 24 elapsed, no unknown period: the shortfall is calculated, so assessed (Fail)
     assert issues_of(result, user) == []
     duration = result.acceptance_items.get(criterion="Test duration")
-    assert duration.source == "Test Program P1"
+    assert duration.source == "Test Program P1 (TCN not issued yet)"
     ProgramRequirement.objects.create(program=program, number=2, criterion="Noise", basis="manual",
                                       requirement_text="No abnormal noise", updated_by=user)  # fmt: skip
+    requirements.sync_requirements(result, user)
     assert [i.anchor for i in issues_of(result, user)] == ["acceptance"]
 
 

@@ -73,7 +73,7 @@ Then, in no fixed order:
 
 | Change | Size | Touches |
 |---|---|---|
-| Requirements flow one way, Program → TCN → Result, instead of being synced from the Result side | Medium | `results/requirements.py`, Test Program, TCN requirement changes |
+| Requirements flow one way, Program → TCN → Result, instead of being synced from the Result side — **done 2026-10-23**: the full list is frozen with each issued TCN revision (`TcnRequirement`, `tcn/requirements.py`); the Result takes it when created, when a new TCN revision is issued while Draft, and when a revision is opened; provisional ("TCN not issued yet") before the TCN is issued; Test Program edits apply forward, the Program page names TCNs issued with the earlier list. TCN document unchanged (only its changes: what the technicians need) | Medium | `results/requirements.py`, Test Program, TCN requirement changes |
 | One change log for the whole app (who changed what, when) | Medium | New table, hooked into every save |
 | Locks in one place instead of per-table checks — **done 2026-10-23**: `testlab/locks.py` holds every edit lock (what locks what, the page messages and the backstops); the Result and the run's evidence share one message | Small | `results/models.py`, `tcn/models.py` |
 | Backup of `data/` to another disk, needed once the app holds records that must be kept | Small | Run script or a scheduled job |

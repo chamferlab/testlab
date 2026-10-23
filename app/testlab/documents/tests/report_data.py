@@ -137,7 +137,7 @@ def dual_run(user, readings=6):
     plots.add_plot(result, dataset, definition, png(), user)
     definition = json.dumps({"signals": [{"column": 3, "axis": "y"}], "time_range": None, "caption": "Motor speed"})
     plots.add_plot(result, dataset, definition, png(), user)
-    requirements.sync_requirements(result, user)  # Program P1 (each seal) and P2
+    requirements.sync_requirements(result, user)  # Program P1 (each seal) and P2, provisional: the TCN is a draft
     for order, (criterion, basis, fields) in enumerate([
         ("IB stator wear", "wear_rate", {"component": ib_stator, "comparison": "<=", "limit": Decimal("0.0000025"), "unit": "in/h"}),
         ("Face condition", "manual", {"requirement_text": "No damage", "actual_text": "No damage seen", "assessment": "pass",

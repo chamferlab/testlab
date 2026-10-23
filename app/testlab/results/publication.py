@@ -31,7 +31,7 @@ from testlab.documents.run_report_context import _datetime, build_run_report_con
 from testlab.documents.tcn_context import format_date
 from testlab.tcn.permissions import can_issue_report
 
-from . import records, requirements
+from . import records
 from .models import RecordIntegrityError, ReportDocument, ReportSelection, TestResult
 
 
@@ -202,8 +202,6 @@ def preview(test_run, profile, user):
                           document={"revision": revision.number, "history": history(result, profile)})
         assets = records.read_assets(revision, {a["path"] for a in context["assets"]})
     else:
-        if result is not None:
-            requirements.sync_requirements(result, user)
         record = build_run_report_context(test_run)
         document = None
         if result is not None and result.is_revising:  # the Draft of revision N: named so, with what is issued

@@ -1,99 +1,77 @@
-"""Acceptance requirements in force for a run, and the Result's items kept in step with them (M2E).
+"""The Result's acceptance items, taken from the requirements in force for the run (M2E).
 
-    Test Program requirement (planned, baseline)        P1, P2, …
-      └─ approved TCN change (issued revision of the run's TCN): replaces it, or makes it
-         not applicable to this run, or adds a requirement
-            └─ AcceptanceItem of the Result (actual, assessment, remark; source recorded)
+    Test Program → TCN (frozen at issue, tcn/requirements.py) → AcceptanceItem of the Result
+                                                                (actual, assessment, remark; source recorded)
 
-Only the run's current issued TCN revision is an approved change; the
-changes of a draft revision are pending and shown, not applied. A
-requirement on leakage or wear without a seal applies to every seal of the
+One way: the Result takes the list of the run's issued TCN revision, never
+the live Test Program. It does so at set moments only (sync_requirements):
+when the Result is created, when a new revision of the run's TCN is issued
+(while the Result is a Draft), and when a revision of a final Result is
+opened. Opening a page, a preview or finalizing changes nothing.
+
+Before the run's TCN is issued (allowed during development and validation),
+the list is provisional: the Test Program as it is now with the draft's
+changes, its sources saying that the TCN is not issued yet. Issuing the TCN
+replaces it with the frozen list. Once a TCN revision is issued, the changes
+of a newer draft revision are pending (shown, not applied).
+
+A requirement on leakage or wear without a seal applies to every seal of the
 arrangement under test (one item per seal, or per seal face present in the
 Result). Items entered on the Result itself have no source and are left
-alone.
-
-sync_requirements() runs while the Result is a Draft (Result page, report
-preview, finalization): it creates the items of new requirements, updates
-the requirement of existing ones (never the engineer's assessment or
-remark), and removes the items of requirements no longer in force — or,
-when the engineer already assessed or remarked on one, keeps it marked as
-no longer in force for the engineer to decide. Finalization freezes the
-items with their sources in the report snapshot.
+alone. Taking a list creates the items of new requirements, updates the
+requirement of existing ones (never the engineer's assessment or remark),
+and removes the items of requirements no longer in force — or, when the
+engineer already assessed or remarked on one, keeps it marked as no longer
+in force for the engineer to decide. Finalization freezes the items with
+their sources in the report snapshot.
 """
-
-from dataclasses import dataclass
 
 from django.db import transaction
 from django.db.models import Max
-from django.utils import timezone
+from django.dispatch import receiver
 
-from testlab.documents.tcn_context import format_date
 from testlab.projects.arrangements import SealRole, seal_under_test_roles
-from testlab.projects.models import RequirementBasis, TestProgram
-from testlab.tcn.models import TcnRequirementChange, TcnRevision
+from testlab.projects.models import RequirementBasis
+from testlab.tcn import requirements as tcn_requirements
+from testlab.tcn.models import TcnRevision
+from testlab.tcn.signals import tcn_issued
 
 from .inspection import FACES
-from .models import WITHDRAWN_PREFIX, AcceptanceItem, Assessment
+from .models import WITHDRAWN_PREFIX, AcceptanceItem, Assessment, TestResult
 
-Action = TcnRequirementChange.Action
 WITHDRAWN = WITHDRAWN_PREFIX
-
-
-@dataclass
-class Effective:
-    """A requirement in force for the run, with where it comes from."""
-
-    values: dict  # AcceptanceRequirementFields values
-    source: str
-    program_requirement: object = None
-    tcn_change: object = None
-    not_applicable: bool = False
-    reason: str = ""  # of a TCN change
-
-
-def _issued(tcn):
-    return f"{tcn}, issued {format_date(timezone.localtime(tcn.issued_at))}"
-
-
-def program_of(project):
-    return TestProgram.objects.filter(project=project).prefetch_related("requirements").first()
+program_of = tcn_requirements.program_of
 
 
 def approved_tcn(test_run):
-    """The run's TCN revision whose requirement changes are in force: the current issued one, or None."""
+    """The run's TCN revision whose requirements are in force: the current issued one, or None."""
     current = test_run.current_revision()
     return current if current is not None and current.status == TcnRevision.Status.ISSUED else None
 
 
+def draft_tcn(test_run):
+    return test_run.revisions.filter(status=TcnRevision.Status.DRAFT).first()
+
+
 def pending_changes(test_run):
-    """Requirement changes of a draft revision of the run: not in force until it is issued."""
-    draft = test_run.revisions.filter(status=TcnRevision.Status.DRAFT).first()
-    return list(draft.requirement_changes.select_related("program_requirement")) if draft else []
+    """Requirement changes of a draft revision after an issued one: not in force until it is issued."""
+    draft = draft_tcn(test_run)
+    if draft is None or approved_tcn(test_run) is None:
+        return []
+    return list(draft.requirement_changes.select_related("program_requirement"))
 
 
 def effective_requirements(test_run):
-    program = program_of(test_run.project)
+    """The list frozen with the run's issued TCN; before it is issued, the provisional list."""
     tcn = approved_tcn(test_run)
-    changes = list(tcn.requirement_changes.select_related("program_requirement")) if tcn else []
-    by_target = {c.program_requirement_id: c for c in changes if c.program_requirement_id}
-    found = []
-    for requirement in program.requirements.all() if program else []:
-        base = f"{program.reference} {requirement.ref}"
-        change = by_target.get(requirement.pk)
-        if change is None:
-            found.append(Effective(requirement.requirement_values(), base, program_requirement=requirement))
-        elif change.action == Action.REPLACE:
-            found.append(Effective(change.requirement_values(), f"{_issued(tcn)}: replaces {base}",
-                                   program_requirement=requirement, tcn_change=change, reason=change.reason))  # fmt: skip
-        else:
-            found.append(Effective(requirement.requirement_values(), f"{base}; not applicable to this run per {_issued(tcn)}",
-                                   program_requirement=requirement, tcn_change=change, not_applicable=True,
-                                   reason=change.reason))  # fmt: skip
-    for change in changes:
-        if change.action == Action.ADD:
-            found.append(Effective(change.requirement_values(), f"{_issued(tcn)}: additional requirement",
-                                   tcn_change=change, reason=change.reason))  # fmt: skip
-    return found
+    if tcn is not None:
+        return tcn_requirements.frozen(tcn)
+    draft = draft_tcn(test_run)
+    return tcn_requirements.in_force(draft) if draft is not None else []
+
+
+def is_provisional(test_run):
+    return approved_tcn(test_run) is None
 
 
 def _criterion(values):
@@ -127,8 +105,8 @@ def desired_items(test_run, result):
         for position, component in expand(effective, test_run, components):
             values = effective.values
             desired.append({
-                "program_requirement_id": effective.program_requirement.pk if effective.program_requirement else None,
-                "tcn_change_id": effective.tcn_change.pk if effective.tcn_change else None,
+                "program_requirement_id": effective.program_requirement_id,
+                "tcn_change_id": effective.tcn_change_id,
                 "position": position,
                 "component_id": component.pk if component else None,
                 "criterion": _criterion(values),
@@ -149,7 +127,8 @@ REQUIREMENT_FIELDS = ["criterion", "basis", "position", "component_id", "compari
 
 
 def sync_requirements(result, user):
-    """Bring the Result's items in step with the requirements in force (Draft only). Returns notices."""
+    """Take the requirements in force into the Result's items (Draft only; at the moments listed in the module
+    docstring). Returns notices."""
     if result.is_final:
         return []
     notices = []
@@ -194,6 +173,13 @@ def sync_requirements(result, user):
                 notices.append(f"“{item.criterion}” is no longer a requirement in force; it was kept because it "
                                "has an assessment or remark. Delete it or keep it as an own criterion.")  # fmt: skip
     return notices
+
+
+@receiver(tcn_issued, dispatch_uid="result_takes_issued_requirements")
+def _take_issued_requirements(sender, tcn, user, **kwargs):
+    result = TestResult.objects.filter(test_run_id=tcn.test_run_id, status=TestResult.Status.DRAFT).first()
+    if result is not None:
+        sync_requirements(result, user)
 
 
 def withdrawn(items):

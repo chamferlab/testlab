@@ -96,10 +96,6 @@ def render_result(request, test_run, result, **forms):
     context = {**run_context(test_run, "result"), "result": result}
     if result is None:
         return render(request, "results/result_start.html", context)
-    if not result.is_final:
-        for notice in requirements.sync_requirements(result, request.user):
-            messages.warning(request, notice)
-        result = get_result(test_run)
     found = evidence.collect(test_run, result)
     components = found["components"]
     items = list(result.acceptance_items.all())

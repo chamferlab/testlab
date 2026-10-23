@@ -376,9 +376,9 @@ WITHDRAWN_PREFIX = "No longer in force — "
 class AcceptanceItem(models.Model):
     """One acceptance criterion of the Result: requirement, actual, assessment, remark.
 
-    The requirement comes from the Test Program or an approved TCN change
-    (program_requirement / tcn_change, kept in step while the Result is a
-    Draft, acceptance.sync_requirements) or is entered on the Result. The
+    The requirement comes from the requirements in force for the run, frozen
+    with its issued TCN (program_requirement / tcn_change, taken at set
+    moments by requirements.sync_requirements) or is entered on the Result. The
     actual is either typed by the engineer (basis manual) or derived from
     structured evidence (acceptance.py), never both. `assessment` is the
     engineer's decision; when it is empty, Pass/Fail is derived only where
@@ -438,7 +438,7 @@ class AcceptanceItem(models.Model):
 
     @property
     def from_requirement(self):
-        """True when the requirement is kept in step with the Test Program or a TCN change."""
+        """True when the requirement comes from the requirements in force (Test Program or a TCN change)."""
         return bool(self.source) and not self.withdrawn
 
     @property

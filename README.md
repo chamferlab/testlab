@@ -135,12 +135,17 @@ What works today:
   the seal/face it applies to (blank: every seal of the arrangement under
   test) and a limit with unit or a wording. Operating set points on the TCN
   are instructions, never acceptance limits. Program sections, planned
-  tests and program revisions are M3.
+  tests and program revisions are M3. Edits apply to TCNs issued from then
+  on: the page names the issued TCNs that still hold the earlier
+  requirements (a new TCN revision brings that run in step).
 - **TCN acceptance requirement changes (M2E)** — on a draft TCN: replace a
   Program requirement for this run, make it not applicable, or add one,
   each with a reason. They are printed on the TCN, frozen at issue, carried
   into a new revision, and in force for the run only while that revision is
-  the run's issued one; a draft's changes are shown as pending.
+  the run's issued one; a draft's changes are shown as pending. Issuing a
+  TCN revision also freezes the full list in force with it (Test Program
+  with its changes applied; not printed): requirements flow one way,
+  Program → TCN → Result.
 - **DCS signal mapping (M2E)** — on a DCS dataset: which TestLab/TCN
   parameter each signal is. Nothing is converted; when the units differ the
   engineer confirms that the values are in the parameter's unit. A reviewed
@@ -186,9 +191,13 @@ What works today:
   *Open in DCS viewer* redraws it from the dataset to adjust and update it.
   Pictures keep the original file unchanged, show pre-test and
   post-test of a component side by side, and have a large compare view.
-  Acceptance items come from the Test Program and approved TCN changes
-  (kept in step while Draft, with their source) or are entered on the
-  Result; each holds requirement, actual, assessment (Pass, Fail, Not
+  Acceptance items come from the requirements frozen with the run's
+  issued TCN (with their source) or are entered on the Result. The Result
+  takes them when it is created, when a new TCN revision is issued while
+  it is a Draft, and when a revision is opened, never on opening a page;
+  before the TCN is issued the list is provisional (Test Program with the
+  draft's changes, marked "TCN not issued yet"). Each item holds
+  requirement, actual, assessment (Pass, Fail, Not
   evaluated, Not applicable) and remark. Pass/Fail is calculated only when
   limit, unit (equivalent units such as cc/h or mm/h are converted; g/h is
   not) and evidence give an unambiguous comparison; otherwise the item is
@@ -463,7 +472,8 @@ app/
     │   ├── migrations/
     │   └── tests/
     ├── tcn/
-    │   ├── models.py           TestRun, TcnRevision, TcnRequirementChange; status rules and immutability guards
+    │   ├── models.py           TestRun, TcnRevision, TcnRequirementChange, TcnRequirement; status rules and immutability guards
+    │   ├── requirements.py     acceptance requirements in force: Test Program + the TCN's changes, frozen at issue
     │   ├── services.py         create / copy TCN, save draft (optimistic locking), issue, revise, cancel, delete
     │   ├── permissions.py      who may issue / cancel a TCN, finalize a Result, undo a log import (M1: every active user)
     │   ├── diff.py             differences vs the source TCN (markers, change list)
@@ -487,7 +497,7 @@ app/
     │   ├── runtime.py          running timeline: running / stopped / unknown from DCS speed and the manual log (M2E)
     │   ├── evidence.py         dynamic/static/mixed leakage, logged period, wear rate, actual ranges, events
     │   ├── acceptance.py       actuals and Pass/Fail where unambiguous; unit conversion
-    │   ├── requirements.py     Test Program + approved TCN changes → acceptance items with their source (M2E)
+    │   ├── requirements.py     requirements in force (frozen with the issued TCN) → acceptance items with their source
     │   ├── finalization.py     blocking issues; Draft → Final: snapshot, stored PDF, hashes (M2E)
     │   ├── leakage_chart.py    cumulative collected volume, SVG for the report (M2E)
     │   ├── images.py           picture storage: original unchanged + display copy

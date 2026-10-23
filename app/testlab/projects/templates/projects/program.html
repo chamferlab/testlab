@@ -24,6 +24,10 @@
 
   <section class="card" id="requirements">
     <div class="card-head"><h2>Acceptance requirements</h2><span class="hint">numbers never change: results and reports refer to them</span></div>
+    <p class="hint">Changes here apply to TCNs issued from now on; a run keeps the requirements of its issued TCN.</p>
+    {% if outdated_tcns %}
+      <p class="alert alert-warning">Issued with the earlier requirements: {% for tcn in outdated_tcns %}<a href="{% url 'tcn:edit' tcn.pk %}">{{ tcn }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}. Issue a new revision of a TCN to apply the Test Program as it is now to that run.</p>
+    {% endif %}
     {% if requirements %}
       <div class="table-scroll">
         <table class="list compact">

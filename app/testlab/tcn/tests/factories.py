@@ -4,7 +4,9 @@ the services, to test the model-level rules on their own."""
 from django.utils import timezone
 
 from testlab.projects.tests.test_models import make_project
+from testlab.tcn import requirements
 from testlab.tcn.models import TcnRevision, TestRun
+from testlab.tcn.signals import tcn_issued
 
 __all__ = ["make_project", "make_run", "new_revision", "issue", "supersede", "cancel"]
 
@@ -39,10 +41,15 @@ def new_revision(source, user):
 
 
 def issue(tcn, user):
+    """Issue without the PDF; as services.issue_tcn, the requirements in force are frozen and the run's Draft
+    Result is told (an earlier issue is not superseded: see supersede)."""
+    issued_at = timezone.now()
+    requirements.freeze(tcn, issued_at)
     tcn.status = TcnRevision.Status.ISSUED
-    tcn.issued_at = timezone.now()
+    tcn.issued_at = issued_at
     tcn.issued_by = user
     tcn.save()
+    tcn_issued.send(sender=TcnRevision, tcn=tcn, user=user)
     return tcn
 
 

@@ -5,7 +5,7 @@ from django.db.models import Max
 
 from testlab.execution import manual_log
 
-from . import inspection
+from . import inspection, requirements
 from .inspection import Component
 from .models import AcceptanceItem, ResultComponent, TestResult
 
@@ -47,6 +47,7 @@ def create_result(test_run, user):
                 result=result, position=position, component=component,
                 material=instructed_material(setup, position, component),
             )
+        requirements.sync_requirements(result, user)  # the requirements in force (provisional before the TCN is issued)
     return result
 
 

@@ -368,6 +368,35 @@ class TcnRequirementChange(AcceptanceRequirementFields):
         )  # fmt: skip
 
 
+class TcnRequirement(AcceptanceRequirementFields):
+    """An acceptance requirement in force for the run, frozen with its TCN revision when it is issued.
+
+    The Test Program requirements as they were at issue, with the revision's
+    changes applied (tcn/requirements.py): what the run is assessed against.
+    Later edits of the Test Program never change it; they reach a run when a
+    new revision of its TCN is issued. The Result takes its requirements from
+    here (results/requirements.py). Not printed on the TCN, which shows only
+    its changes. Written once at issue; locked with the TCN (testlab/locks.py).
+    """
+
+    tcn = models.ForeignKey(TcnRevision, on_delete=models.CASCADE, related_name="requirements_in_force")
+    order = models.PositiveIntegerField()
+    # Where it comes from; the links go when their source is deleted, the text stays.
+    program_requirement = models.ForeignKey(ProgramRequirement, on_delete=models.SET_NULL, null=True, blank=True,
+                                            related_name="+")  # fmt: skip
+    tcn_change = models.ForeignKey(TcnRequirementChange, on_delete=models.SET_NULL, null=True, blank=True,
+                                   related_name="+")  # fmt: skip
+    source = models.CharField(max_length=300)  # e.g. "Test Program TP-7 rev A P1"
+    not_applicable = models.BooleanField(default=False)  # waived for this run by the TCN
+    reason = models.TextField(blank=True)  # of the TCN change
+
+    class Meta:
+        ordering = ["tcn", "order"]
+
+    def __str__(self):
+        return f"{self.tcn}: {self.source}"
+
+
 def _check_deletable(revisions):
     # Checked against the database: an instance may be stale.
     issued = revisions.exclude(status=TcnRevision.Status.DRAFT)

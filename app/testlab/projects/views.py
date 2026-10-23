@@ -257,8 +257,11 @@ class ProgramView(View):
 
     def render(self, request, project, program, form, requirement_form):
         requirements = list(program.requirements.all()) if program else []
+        from testlab.tcn import requirements as tcn_requirements
+
         context = {"project": project, "program": program, "form": form, "requirements": requirements,
-                   "requirement_form": requirement_form}  # fmt: skip
+                   "requirement_form": requirement_form,
+                   "outdated_tcns": tcn_requirements.outdated(project)}  # fmt: skip
         return render(request, self.template_name, context)
 
 

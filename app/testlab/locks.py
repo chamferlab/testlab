@@ -3,7 +3,8 @@
     Rule                       Locked when                                  What it locks
     tcn_lock(tcn)              the TCN revision is issued, superseded or    the revision, its run setup and seal
                                cancelled                                    positions, its acceptance requirement
-                                                                            changes
+                                                                            changes and the requirements in force
+                                                                            frozen with it
     project_no_lock(project)   a TCN of the project has been issued         the project number
     result_lock(test_run)      the run's Result is Final                    the Result and everything under it
                                                                             (components, pictures, plots,
@@ -188,6 +189,15 @@ def _test_runs(sender, instance):
     return TestRun.objects.filter(pk__in=list(run_ids))
 
 
+def _tcn_requirement_guard(sender, instance, **kwargs):
+    """The requirements in force frozen with a TCN revision: written while it is a draft, at issue."""
+    from testlab.tcn.models import ImmutableTcnError, TcnRevision
+
+    tcn = TcnRevision.objects.filter(pk=instance.tcn_id).first()
+    if tcn is not None and (lock := tcn_lock(tcn)):
+        raise ImmutableTcnError(f"The requirements in force are frozen with the TCN: {lock}")
+
+
 def _result_guard(sender, instance, update_fields=None, **kwargs):
     from testlab.execution.models import DcsDataset
     from testlab.results.models import FinalResultError
@@ -226,6 +236,7 @@ def register():
     from testlab.results.models import (AcceptanceItem, DimensionalReading, FaceMeasurement, MahrAnalysis,
                                         MeasurementFigure, MeasurementFile, ResultComponent, ResultImage, ResultPlot,
                                         RoundpakAnalysis)  # fmt: skip
+    from testlab.tcn.models import TcnRequirement
 
     signals = {"save": pre_save, "delete": pre_delete}
 
@@ -235,6 +246,7 @@ def register():
                 signals[name].connect(rule, sender=model, dispatch_uid=f"lock{rule.__name__}_{name}_{model.__name__}")
 
     guard(_tcn_part_guard, [RunSetup, SealPosition])
+    guard(_tcn_requirement_guard, [TcnRequirement])
     guard(_result_guard, [ResultComponent, ResultImage, ResultPlot, AcceptanceItem, FaceMeasurement, MeasurementFile,
                           MeasurementFigure, DimensionalReading, MahrAnalysis, RoundpakAnalysis,
                           ManualLogEntry, ManualMeasurement, DcsDataset, DcsRunningDetermination, ManualLogImport,

@@ -28,6 +28,7 @@ from django.utils import timezone
 
 from testlab.tcn.permissions import can_revise_result
 
+from . import requirements
 from .models import ReportDocument, ResultRevision, TestResult
 
 
@@ -71,7 +72,9 @@ def open_revision(result, user, reason):
         )  # fmt: skip
         if opened != 1:
             raise RevisionError("The Result was changed by another request.")
-    return TestResult.objects.get(pk=result.pk)
+        result = TestResult.objects.get(pk=result.pk)
+        requirements.sync_requirements(result, user)  # a TCN issued since the last revision now applies
+    return result
 
 
 def supersede_earlier(revision, user, now):
