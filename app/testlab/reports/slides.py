@@ -9,10 +9,8 @@ adjusts the deck in PowerPoint where needed.
     Project   title (with the current tester drawing), test matrix, parts (New = Y/N)
     Per run   divider; test conditions with the conclusion and the seal cross section;
               one slide per DCS plot; leakage and acceptance with the cumulative leakage chart;
+              seal-face measurements: waviness (ROUNDPAK), taper and Ra (Mahr), Pre and Post;
               every picture of the Customer Test Run Report, four per slide
-
-Seal-face measurements (taper, Ra, waviness) are left out until the engineer
-has decided which values the slides show (ROADMAP).
 
 Template: data/slides-template.pptx, or the .pptx TESTLAB_SLIDES_TEMPLATE
 names; kept out of git (the company template changes every year). Its slides are removed and its layouts
@@ -51,7 +49,6 @@ BOTTOM = Inches(0.55)  # kept free for the template's logo and slide number
 CAPTION_H = Inches(0.3)
 MATRIX_ROWS = 10  # rows per slide; more go on a continuation slide
 PARTS_ROWS = 14
-DRAWING_MAX_PX = 2400
 
 
 class SlidesError(Exception):
@@ -293,27 +290,6 @@ def _chart_pictures(runs):
     return chromium.screenshots({"charts.html": page.encode()}, "charts.html", svgs, BUNDLE_URL)
 
 
-def drawing_picture(drawing):
-    """A picture of the drawing: its display copy, or the first page of a PDF."""
-    if not drawing.is_pdf:
-        with drawing.file.storage.open(drawings.preview_name(drawing), "rb") as preview:
-            return preview.read()
-    import pypdfium2
-
-    with drawing.file.open("rb") as stored:
-        document = pypdfium2.PdfDocument(stored.read())
-    try:
-        page = document[0]
-        width, height = page.get_size()
-        scale = min(DRAWING_MAX_PX / max(width, height), 300 / 72)
-        image = page.render(scale=scale).to_pil()
-    finally:
-        document.close()
-    out = io.BytesIO()
-    image.convert("RGB").save(out, "PNG")
-    return out.getvalue()
-
-
 # ---- project slides ----------------------------------------------------------------------------
 
 
@@ -323,7 +299,7 @@ def _title_slide(deck, project):
     tester = drawings.current(project, ProjectDrawing.Kind.TESTER)
     if tester is not None:
         _, right = split(area, 0.5)
-        picture(slide, drawing_picture(tester), right, f"Tester drawing {tester}")
+        picture(slide, drawings.pictures(tester, max_pages=1)[0], right, f"Tester drawing {tester}")
 
 
 def _matrix_slides(deck, summaries):
@@ -418,6 +394,8 @@ def _run_slides(deck, run, chart):
     if chart:
         picture(slide, chart, right, "Cumulative collected leakage")
 
+    _measurement_slide(deck, name, ctx)
+
     # Every picture of the Customer report, four per slide (Pre ↔ Post side by side).
     for index, rows in enumerate(chunks(_picture_rows(ctx, skip=cross_sections[:1]), 2)):
         if not rows:
@@ -432,6 +410,41 @@ def _run_slides(deck, run, chart):
                 head.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
                 body = (cell_box[0], cell_box[1] + CAPTION_H, cell_box[2], cell_box[3] - CAPTION_H)
                 picture(slide, assets[item["src"]], body, item["caption"])
+
+
+# Slide columns: (heading, kind, summary quantity) of the Pre/Post measurement summary.
+MEASUREMENTS = [
+    ("Waviness", "roundpak", "Face flatness (circular trace)"),
+    ("Taper", "mahr", "Face taper (Mahr)"),
+    ("Ra", "mahr", "Roughness Ra"),
+]
+
+
+def measurement_rows(ctx):
+    """[component, Pre and Post of each MEASUREMENTS column, …] for the components with any of them."""
+    rows = []
+    for group in ctx.get("measurements", []):
+        found = {(row["kind"], row["quantity"]): row for row in group["rows"]}
+        cells = []
+        for _, kind, quantity in MEASUREMENTS:
+            row = found.get((kind, quantity))
+            cells += [row["pre"]["value"], row["post"]["value"]] if row else [DASH, DASH]
+        if any(cell != DASH for cell in cells):
+            rows.append([group["component"], *cells])
+    return rows
+
+
+def _measurement_slide(deck, name, ctx):
+    rows = measurement_rows(ctx)
+    if not rows:
+        return
+    slide, area = deck.slide("content", f"{name} – Seal-face measurements")
+    header = ["Component"] + [f"{heading} {stage} [µm]" for heading, _, _ in MEASUREMENTS for stage in ("Pre", "Post")]
+    table(slide, area, header, rows, [1.6] + [1] * (len(header) - 1), size=12)
+    used = Inches(0.3) * (len(rows) + 1) + GAP
+    text(slide, (area[0], area[1] + used, area[2], Inches(0.6)), [
+        ("Waviness: ROUNDPAK instrument flatness FLTt of one circular trace. Taper (signed: negative ID high, "
+         "positive OD high) and Ra (mean of the left and right scans): Mahr.", False, 11)])  # fmt: skip
 
 
 def _picture_rows(ctx, skip=()):

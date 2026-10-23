@@ -169,3 +169,71 @@ def test_real_pdf_starts_each_run_on_a_new_page(user, two_finals):
     assert 0 < starts[0] < starts[1]
     assert "6. Conclusion Both runs are reported." in pages[-1] and "5.2 Run 002 (29-" not in pages[-1]
     assert all(f"Report No.: {project.project_no}R" in page for page in pages)  # header on every page
+
+
+def drawing_upload(name, size, kind="PNG", pages=1):
+    import io
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from PIL import Image
+
+    out = io.BytesIO()
+    images = [Image.new("RGB", size, "gray") for _ in range(pages)]
+    images[0].save(out, kind, save_all=pages > 1, append_images=images[1:])
+    return SimpleUploadedFile(name, out.getvalue())
+
+
+def test_appendices_show_the_current_tester_drawing_and_pid(user, two_finals):
+    import io
+
+    from PIL import Image
+
+    from testlab.projects import drawings
+
+    project, result1, _ = two_finals
+    include(project, user, result1)
+    assert assembly.build(project)[0]["appendices"] == []
+    drawings.add_drawing(project, "tester", drawing_upload("old.png", (100, 200)), user, "F001842744", "1")
+    drawings.add_drawing(project, "tester", drawing_upload("tester.png", (300, 200)), user, "F001842744", "2")
+    drawings.add_drawing(project, "pid", drawing_upload("pid.pdf", (300, 200), "PDF", pages=2), user, "P-100")
+    context, assets, _ = assembly.build(project)
+    tester, pid = context["appendices"]
+    assert (tester["letter"], tester["title"], tester["drawing"]) == ("A", "Tester drawing", "F001842744 rev 2")
+    assert (pid["letter"], pid["title"], pid["drawing"], len(pid["pages"])) == ("B", "System P&ID", "P-100", 2)
+    for path in tester["pages"] + pid["pages"]:
+        with Image.open(io.BytesIO(assets[path])) as page:
+            assert page.height > page.width  # landscape pages are turned to fill the portrait page
+    html = assembly.final_report_template().render_parts(context)[0]
+    assert "Appendix A – Tester drawing F001842744 rev 2" in html
+    assert "Appendix B – System P&amp;ID P-100 (page 2 of 2)" in html
+
+
+@pytest.mark.chromium
+def test_real_pdf_has_each_drawing_page_on_its_own_page(user, two_finals):
+    import io
+
+    import pypdf
+
+    from testlab.projects import drawings
+
+    project, result1, _ = two_finals
+    include(project, user, result1, conclusion="Reported.")
+    drawings.add_drawing(project, "tester", drawing_upload("tester.png", (300, 200)), user, "F001842744", "2")
+    drawings.add_drawing(project, "pid", drawing_upload("pid.pdf", (300, 200), "PDF"), user, "P-100")
+    pages = [" ".join(page.extract_text().split())
+             for page in pypdf.PdfReader(io.BytesIO(assembly.render_pdf(project))).pages]  # fmt: skip
+    assert "Appendix A – Tester drawing F001842744 rev 2" in pages[-2]
+    assert "Appendix B – System P&ID P-100" in pages[-1]
+    assert "Appendices" in pages[-3] and "6. Conclusion Reported." in pages[-3]
+
+
+def test_unreadable_drawing_is_reported(user, two_finals):
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from testlab.projects import drawings
+
+    project, result1, _ = two_finals
+    include(project, user, result1)
+    drawings.add_drawing(project, "pid", SimpleUploadedFile("pid.pdf", b"%PDF-1.7 broken"), user, "P-100")
+    with pytest.raises(assembly.AssemblyError, match="system p&id P-100 cannot be shown"):
+        assembly.build(project)

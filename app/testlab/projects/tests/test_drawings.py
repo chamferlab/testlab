@@ -110,6 +110,22 @@ def test_only_the_current_drawing_can_be_deleted(project, user, file_storage, dj
     assert drawings.current(project, "tester") == first
 
 
+def test_drawing_in_an_issued_final_report_cannot_be_deleted(project, user):
+    from django.utils import timezone
+
+    from testlab.reports.models import FinalReport, FinalReportDocument
+
+    drawing = drawings.add_drawing(project, "pid", upload("p.pdf", PDF), user, "P-100")
+    report = FinalReport.objects.create(project=project, updated_by=user)
+    FinalReportDocument.objects.create(report=report, revision=0, identity=f"{project.project_no}R-R0",
+                                       file="r0.pdf", sha256="0" * 64, size=1, issued_at=timezone.now(),
+                                       issued_by=user)  # fmt: skip
+    with pytest.raises(drawings.DrawingUploadError, match=f"issued Final Report {project.project_no}R-R0"):
+        drawings.delete_drawing(drawing)
+    newer = drawings.add_drawing(project, "pid", upload("p2.pdf", PDF), user, "P-100", "B")
+    assert drawings.delete_refusal(newer) is None  # issued before it was uploaded
+
+
 def test_missing_preview_rebuilt(project, user, file_storage):
     drawing = drawings.add_drawing(project, "tester", upload("a.tif", picture("TIFF")), user, "F1")
     (file_storage / drawing.preview_file).unlink()

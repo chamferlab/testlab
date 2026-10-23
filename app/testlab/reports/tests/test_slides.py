@@ -209,3 +209,46 @@ def test_chart_svg_becomes_a_png_with_chromium():
     with Image.open(io.BytesIO(shots["chart-0"])) as image:
         assert image.format == "PNG" and image.size == (400, 200)
         assert image.convert("RGB").getpixel((10, 10)) == (255, 0, 0)
+
+
+def summary_row(kind, quantity, pre, post):
+    return {"kind": kind, "quantity": quantity, "pre": {"value": pre}, "post": {"value": post}}
+
+
+def test_measurement_rows_take_waviness_from_roundpak_and_taper_and_ra_from_mahr():
+    ctx = {"measurements": [
+        {"component": "IB Stator", "rows": [
+            summary_row("roundpak", "Face flatness (circular trace)", "0.412", "0.530"),
+            summary_row("roundpak", "Face taper (ROUNDPAK)", "+0.9", "+1.1"),  # not on the slide: Mahr's taper is
+            summary_row("mahr", "Face taper (Mahr)", "−0.2100", "+0.0500"),
+            summary_row("mahr", "Roughness Ra", "0.051", "0.064"),
+            summary_row("dimensional", "Face length", "1.25037", "1.25025"),
+        ]},
+        {"component": "IB Rotor", "rows": [summary_row("mahr", "Roughness Ra", "0.040", "—")]},
+        {"component": "Sleeve", "rows": [summary_row("dimensional", "Dimension", "2.0", "2.0")]},
+    ]}  # fmt: skip
+    assert slides.measurement_rows(ctx) == [
+        ["IB Stator", "0.412", "0.530", "−0.2100", "+0.0500", "0.051", "0.064"],
+        ["IB Rotor", "—", "—", "—", "—", "0.040", "—"],
+    ]
+
+
+def test_measurements_slide_after_the_results(report, fake_charts, monkeypatch):
+    presented = slides.assembly.presented
+
+    def with_measurements(result):
+        ctx, assets = presented(result)
+        ctx["measurements"] = [{"component": "IB Stator", "rows": [
+            summary_row("mahr", "Face taper (Mahr)", "−0.2100", "+0.0500")]}]  # fmt: skip
+        return ctx, assets
+
+    monkeypatch.setattr(slides.assembly, "presented", with_measurements)
+    deck = deck_of(slides.build(report.project))
+    titles = [title_of(s) for s in deck.slides]
+    index = titles.index("Run 002 – Seal-face measurements")
+    assert titles[index - 1] == "Run 002 – Results"
+    assert table_rows(deck.slides[index]) == [
+        ["Component", "Waviness Pre [µm]", "Waviness Post [µm]", "Taper Pre [µm]", "Taper Post [µm]", "Ra Pre [µm]",
+         "Ra Post [µm]"],
+        ["IB Stator", "—", "—", "−0.2100", "+0.0500", "—", "—"],
+    ]  # fmt: skip

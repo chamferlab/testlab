@@ -257,16 +257,20 @@ What works today:
   after issuing; the page lists what changed since the issued document.
   The PDF carries a document history (document, revision, date, status);
   reasons and names stay on the page, as for Customer Test Run Reports.
-  No appendices yet.
+  Appendices after the conclusion: the current tester drawing and system
+  P&ID of the Project defaults, one report page per drawing page
+  (landscape pages turned to fill the portrait page). A drawing in an
+  issued Final Report can no longer be deleted.
 - **Slides (.pptx)** — Final Report page → *Slides (.pptx)*: the included
   runs as PowerPoint slides, an editable copy made on request and never
   stored. Title (with the current tester drawing), test matrix, parts
   (Face condition and New = Y/N: Y for "New", N for any other condition),
   then per run a divider, test conditions with the conclusion and the
   seal cross section, one slide per DCS plot, leakage and acceptance with
-  the cumulative leakage chart, and every picture of the Customer Test Run
-  Report, four per slide. Same data and selection as the Final Report.
-  Seal-face measurements are not on the slides yet. The company template
+  the cumulative leakage chart, the seal-face measurements (waviness from
+  ROUNDPAK, taper and Ra from Mahr, Pre and Post, from the run's summary),
+  and every picture of the Customer Test Run Report, four per slide. Same
+  data and selection as the Final Report. The company template
   is a `.pptx` kept out of git: `data/slides-template.pptx` (or the file
   `TESTLAB_SLIDES_TEMPLATE` names); its slides are removed and its layouts used (the first for the title, a
   "Section…" layout for the runs, a title-only layout for the content).

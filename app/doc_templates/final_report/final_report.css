@@ -8,3 +8,9 @@ table.grid.summary td, table.grid.summary tbody th { padding: 2pt 3pt; }
 
 /* Document history under the identification. */
 section.identification table.history { margin-top: 6pt; }
+
+/* Appendices (section.annex: a new page each): one drawing page per report page, as large as the page allows (landscape pages are turned). */
+ul.appendices { margin: 0; padding-left: 14pt; }
+figure.drawing { margin: 4pt 0 0; }
+figure.drawing img { max-height: 220mm; }
+body.draft figure.drawing img { max-height: 212mm; }

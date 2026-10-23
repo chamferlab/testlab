@@ -13,7 +13,8 @@ served as it is.
 Uploading a drawing of a kind that already has one makes the new one the
 current drawing; the earlier ones are kept as its history and are never
 changed. Only the current drawing can be deleted (a wrong upload), which
-makes the previous one current again.
+makes the previous one current again, and only while no Final Report has
+been issued with it (its appendices show the current drawings).
 """
 
 import hashlib
@@ -145,10 +146,41 @@ def preview_name(drawing):
     return name
 
 
+def pictures(drawing, max_px=2400, max_pages=None):
+    """The drawing as pictures for documents: the display copy of a picture, or every page of a PDF as PNG
+    (the first `max_pages`)."""
+    if not drawing.is_pdf:
+        with _storage().open(preview_name(drawing), "rb") as preview:
+            return [preview.read()]
+    import pypdfium2
+
+    with drawing.file.open("rb") as stored:
+        document = pypdfium2.PdfDocument(stored.read())
+    found = []
+    try:
+        for index in range(min(len(document), max_pages or len(document))):
+            page = document[index]
+            width, height = page.get_size()
+            image = page.render(scale=min(max_px / max(width, height), 300 / 72)).to_pil()
+            out = io.BytesIO()
+            image.convert("RGB").save(out, "PNG")
+            found.append(out.getvalue())
+    finally:
+        document.close()
+    return found
+
+
 def delete_refusal(drawing):
     """Why this drawing cannot be deleted, or None."""
+    from testlab.reports.models import FinalReportDocument
+
     if current(drawing.project, drawing.kind) != drawing:
         return "Only the current drawing can be deleted; earlier drawings are kept as its history."
+    # The current drawing is in every Final Report issued since it was uploaded (its appendices).
+    issued = FinalReportDocument.objects.filter(report__project=drawing.project, issued_at__gte=drawing.uploaded_at)
+    if issued.exists():
+        return (f"This drawing is in the issued Final Report {issued.order_by('-issued_at').first().identity}: "
+                "upload a new drawing instead; this one is kept as its history.")
     return None
 
 

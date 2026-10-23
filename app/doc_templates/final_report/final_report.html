@@ -89,7 +89,20 @@
   <section class="closing">
     <h2>{{ results_section|add:1 }}. Conclusion</h2>
     {% for paragraph in texts.conclusion %}<p class="text">{% for line in paragraph %}{{ line }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</p>{% empty %}<p class="note">Not written yet.</p>{% endfor %}
+    {% if appendices %}
+    <h3>Appendices</h3>
+    <ul class="appendices">{% for appendix in appendices %}<li>Appendix {{ appendix.letter }} – {{ appendix.title }} {{ appendix.drawing }}</li>{% endfor %}</ul>
+    {% endif %}
   </section>
+
+  {% for appendix in appendices %}
+  {% for page in appendix.pages %}
+  <section class="annex appendix">
+    <h2>Appendix {{ appendix.letter }} – {{ appendix.title }} {{ appendix.drawing }}{% if appendix.pages|length > 1 %} (page {{ forloop.counter }} of {{ appendix.pages|length }}){% endif %}</h2>
+    <figure class="drawing"><img src="{{ page }}" alt="{{ appendix.title }} {{ appendix.drawing }}"></figure>
+  </section>
+  {% endfor %}
+  {% endfor %}
 </main>
 </body>
 </html>

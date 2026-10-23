@@ -4,24 +4,31 @@
     summary table                one row per included run, from its frozen record
     texts                        written by the engineer (models.FinalReport)
     one section per run          the Customer presentation of the run's latest final revision
+    appendices                   the current tester drawing and system P&ID (Project Defaults)
 
 A run's section is rendered by the Test Run Report template from the frozen
 record and assets of the revision (results/records.py), with the run's
 Customer report contents: the same data and the same selection as its
 Customer Test Run Report, so the two cannot differ. Nothing is read from
-live Result data. A draft is rendered on request and never stored; issuing
+live Result data. The appendices show the project's current drawings: an
+issued report keeps the ones current when it was issued. A draft is rendered on request and never stored; issuing
 (publication.py) renders the same context with the document's identity.
 """
 
+import io
 import re
 
 from django.utils import timezone
+from PIL import Image
+from pypdfium2 import PdfiumError
 
 from testlab.documents import pdf
 from testlab.documents.render import ChromiumTemplate, run_report_template, template_path
 from testlab.documents.report_profiles import present
 from testlab.documents.run_report_context import _datetime, _paragraphs
 from testlab.documents.tcn_context import format_date
+from testlab.projects import drawings
+from testlab.projects.models import ProjectDrawing
 from testlab.results import publication, records
 from testlab.results.models import ReportDocument, TestResult
 
@@ -142,6 +149,38 @@ def _run_section(template, result, index, assets):
             "document": ctx["document"].get("identity", ""), "result": result.pk}  # fmt: skip
 
 
+def _upright(content):
+    """A landscape page turned a quarter to the left, so that it fills a portrait page (read from the right)."""
+    with Image.open(io.BytesIO(content)) as image:
+        if image.width <= image.height:
+            return content
+        out = io.BytesIO()
+        image.rotate(90, expand=True).convert("RGB").save(out, "PNG")
+    return out.getvalue()
+
+
+def appendices(project, assets):
+    """Appendix A, B, … : the current tester drawing and system P&ID, one page of the report per drawing page."""
+    found = []
+    for kind in (ProjectDrawing.Kind.TESTER, ProjectDrawing.Kind.PID):
+        drawing = drawings.current(project, kind)
+        if drawing is None:
+            continue
+        try:
+            pictures = drawings.pictures(drawing)
+        except (PdfiumError, OSError) as error:  # a PDF pdfium cannot read, a missing file
+            raise AssemblyError(f"The {kind.label.lower()} {drawing} cannot be shown as a picture ({error}); "
+                                "upload it again on the Project defaults page.") from error  # fmt: skip
+        pages = []
+        for number, content in enumerate(pictures, start=1):
+            path = f"assets/appendix/{kind}-{drawing.sha256[:12]}-{number}.png"
+            assets[path] = _upright(content)
+            pages.append(path)
+        found.append({"letter": chr(ord("A") + len(found)), "title": kind.label, "drawing": str(drawing),
+                      "pages": pages})  # fmt: skip
+    return found
+
+
 def build(project, document=None):
     """(context, assets, template) of the project's Final Report: a draft, or the issue `document` describes
     ({"identity", "revision", "issued_on", "history"})."""
@@ -168,6 +207,7 @@ def build(project, document=None):
         "summary": [run["summary"] for run in runs],
         "runs": runs,
         "results_section": RESULTS_SECTION,
+        "appendices": appendices(project, assets),
     }
     return context, assets, template
 

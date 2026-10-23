@@ -1,6 +1,6 @@
 # TestLab roadmap
 
-Where the project stands and what comes next. Written 2026-10-12, last updated 2026-10-17; update it at the end of
+Where the project stands and what comes next. Written 2026-10-12, last updated 2026-10-23; update it at the end of
 each working session.
 
 ## Where we are
@@ -21,9 +21,10 @@ each working session.
   draft PDF, and since 2026-10-14 issuing: `<project>R-R0`, `-R1`, … stored
   once, the earlier one Superseded, a reason from R1, refused while an
   included run has a Result revision in progress. The texts stay editable
-  after issuing; the page says what changed since the issue. Missing:
-  appendices (drawings, P&ID) and the Test Program texts it could start
-  from (the Test Program holds acceptance requirements only).
+  after issuing; the page says what changed since the issue. Appendices
+  with the tester drawing and system P&ID since 2026-10-23. Missing: the
+  Test Program texts it could start from (the Test Program holds
+  acceptance requirements only).
 - Validated on Windows: up to M2D and the Chromium report (2026-10-05).
   M2E, running intervals, log import, M2F-a, B1 and B2 are not.
   The automated tests pass on Windows and Linux on GitHub for 3fe4635
@@ -77,13 +78,16 @@ Then, in no fixed order:
 | Locks in one place instead of per-table checks | Small | `results/models.py`, `tcn/models.py` |
 | Backup of `data/` to another disk, needed once the app holds records that must be kept | Small | Run script or a scheduled job |
 | "On record" from an explicit list of what each revision froze, instead of by time added | Small | `results/models.py`, `results/records.py` |
-| Tester drawing and system P&ID in the Project Defaults (below) — **built 2026-10-17, under review** | Small | `projects/` model and Project Defaults screen |
-| PowerPoint slides of a project's tests, filled from the frozen records (below) — **built 2026-10-17 without the measurements slide, under review** | Medium | New export next to `reports/`; template path in the settings, not in git |
+| Tester drawing and system P&ID in the Project Defaults (below) — **built 2026-10-17; in the Final Report appendices 2026-10-23, under review** | Small | `projects/` model and Project Defaults screen |
+| PowerPoint slides of a project's tests, filled from the frozen records (below) — **built 2026-10-17; measurements slide 2026-10-23, under review** | Medium | New export next to `reports/`; template path in the settings, not in git |
 
 ### PowerPoint slides (built 2026-10-17, under review)
 
 Built (`reports/slides.py`): *Slides (.pptx)* on the Final Report page, all
-slides below except the measurements; the run's results slide shows running
+slides below; the measurements are on a slide of their own after the
+run's results (2026-10-23): waviness = ROUNDPAK instrument flatness FLTt,
+taper and Ra from Mahr, Pre and Post, as in the run's measurement summary
+(so only when the Customer contents show that summary). The run's results slide shows running
 time, leakage and acceptance with the leakage chart. Template from
 `data/slides-template.pptx` or `TESTLAB_SLIDES_TEMPLATE` (layouts picked by name and placeholders), else
 plain widescreen slides. New libraries: `python-pptx`, `pypdfium2` (a PDF
@@ -159,9 +163,10 @@ becomes the current drawing, the earlier ones are kept as its history
 (as the first requirements asked: "current P&ID + possible revisions");
 only the current one can be deleted, for a wrong upload.
 
-Not yet: nothing uses the drawings yet (deck front page, Final Report
-appendices). When a document uses one, it must keep the file it was made
-with, and that drawing can no longer be deleted.
+Used by the deck's front page (tester drawing) and, since 2026-10-23, the
+Final Report appendices (A tester drawing, B system P&ID; every page of a
+PDF, landscape pages turned). The issued PDF keeps the drawing it was made
+with; a drawing in an issued Final Report can no longer be deleted.
 
 ## Left alone
 
