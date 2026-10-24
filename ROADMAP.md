@@ -1,6 +1,6 @@
 # TestLab roadmap
 
-Where the project stands and what comes next. Written 2026-10-12, last updated 2026-10-23; update it at the end of
+Where the project stands and what comes next. Written 2026-10-12, last updated 2026-10-24; update it at the end of
 each working session.
 
 ## Where we are
@@ -167,6 +167,31 @@ Used by the deck's front page (tester drawing) and, since 2026-10-23, the
 Final Report appendices (A tester drawing, B system P&ID; every page of a
 PDF, landscape pages turned). The issued PDF keeps the drawing it was made
 with; a drawing in an issued Final Report can no longer be deleted.
+
+### Lab planner (Cut 1 built 2026-10-24, under review)
+
+From `reference/PLANNING_BRIEF.md` and `reference/units-planning.png`
+(the hand-made yearly slide). Built on `main`, app `planning/`: test units
+A–D (admin), bookings and unit blocks by ISO week, the lab plan page
+(`/planning/`, *Lab plan* in the top bar) and their forms.
+
+Answered 2026-10-24:
+- P and X on the slide (Preparation, end of project) are not shown.
+- Not tied to the TCN: tests are planned months before their TCN; the
+  TCN's free-text test unit stays separate.
+- Project no., description and PE(s) are free text on the booking; the plan
+  links to the TestLab project with that number once it exists.
+- No past years: planning starts with 2026.
+- Firefox, Chrome and Edge: weeks are picked from a list, not
+  `<input type="week">`.
+- Kept from the brief: a unit holds one booking or block at a time
+  (Tentative counts, Cancelled does not; touching weeks allowed); one
+  booking per project; bookings may cross the year end.
+
+Not in Cut 1: per-booking change history (left to the app-wide change
+log). Cut 2, after use: planned runs inside a booking with their actual
+period from the manual log and DCS data, free periods per unit. Later:
+PowerPoint export of the plan, drag to move.
 
 ## Left alone
 

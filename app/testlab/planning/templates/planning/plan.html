@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Lab plan {{ year }} · TestLab{% endblock %}
+{% block main_class %}wide{% endblock %}
+{% block content %}
+  <div class="page-head">
+    <div class="title">
+      <h1>Lab plan {{ year }}</h1>
+      <nav class="plan-years" aria-label="Year">
+        {% for y in years %}<a href="?year={{ y }}{% if show_cancelled %}&amp;cancelled=1{% endif %}"{% if y == year %} class="active" aria-current="page"{% endif %}>{{ y }}</a>{% endfor %}
+      </nav>
+    </div>
+    {% if can_edit %}
+      <div class="actions">
+        <a class="button btn-primary" href="{% url 'planning:booking_create' %}?year={{ year }}">New booking</a>
+        <a class="button" href="{% url 'planning:block_create' %}?year={{ year }}">Block a unit</a>
+      </div>
+    {% endif %}
+  </div>
+  <p class="plan-legend">
+    <span><i class="swatch confirmed"></i>Confirmed</span>
+    <span><i class="swatch tentative"></i>Tentative</span>
+    <span><i class="swatch done"></i>Done</span>
+    <span><i class="swatch block"></i>Unit blocked</span>
+    {% if current_week %}<span><i class="swatch now"></i>This week (w{{ current_week }})</span>{% endif %}
+    <a href="?year={{ year }}{% if not show_cancelled %}&amp;cancelled=1{% endif %}">{% if show_cancelled %}Hide{% else %}Show{% endif %} cancelled bookings</a>
+  </p>
+
+  <div class="table-card plan-scroll">
+    <div class="lab-plan" style="--weeks: {{ n_weeks }}">
+      <div class="plan-row plan-months">
+        <div class="label head" style="grid-column: 1 / 4"></div>
+        {% for name, span in months %}<div class="month" style="grid-column: span {{ span }}">{{ name }}</div>{% endfor %}
+      </div>
+      <div class="plan-row plan-weeks">
+        <div class="label head">Project</div><div class="label head">Description</div><div class="label head">PE(s)</div>
+        {% for w in week_numbers %}<div class="week-no{% if w == current_week %} now{% endif %}">w{{ w }}</div>{% endfor %}
+      </div>
+      {% for row in units %}
+        <div class="plan-row plan-unit">
+          <div class="label" style="grid-column: 1 / 4">
+            <strong>{{ row.unit.code }}</strong>{% if row.unit.name %} <span class="muted">{{ row.unit.name }}</span>{% endif %}
+            {% if not row.unit.active %}<span class="muted">(inactive)</span>{% endif %}
+            <span class="plan-use" title="Weeks of {{ year }} booked by projects (Tentative, Confirmed, Done) and blocked">{{ row.booked_weeks }} of {{ n_weeks }} weeks booked{% if row.blocked_weeks %} · {{ row.blocked_weeks }} blocked{% endif %}</span>
+            {% if can_edit and row.unit.active %}<a class="plan-add" href="{% url 'planning:booking_create' %}?unit={{ row.unit.pk }}&amp;year={{ year }}" title="New booking on unit {{ row.unit.code }}">+ Booking</a>{% endif %}
+          </div>
+          <div class="weeks-bg"></div>
+          {% if current_week %}<div class="now" style="grid-column: {{ current_week|add:3 }}"></div>{% endif %}
+        </div>
+        {% for bar in row.bars %}
+          {% with item=bar.item %}
+            <div class="plan-row">
+              {% if bar.is_booking %}
+                <div class="label id">{% if bar.project %}<a href="{% url 'projects:detail' bar.project.pk %}" title="Open project {{ item.project_no }}">{{ item.project_no }}</a>{% else %}{{ item.project_no }}{% endif %}</div>
+                <div class="label" title="{{ item.description }}">{{ item.description }}</div>
+                <div class="label" title="{{ item.engineers }}">{{ item.engineers|default:"" }}</div>
+              {% else %}
+                <div class="label muted">{{ item.get_kind_display }}</div>
+                <div class="label muted" title="{{ item.note }}" style="grid-column: span 2">{{ item.note|default:"" }}</div>
+              {% endif %}
+              <div class="weeks-bg"></div>
+              {% if current_week %}<div class="now" style="grid-column: {{ current_week|add:3 }}"></div>{% endif %}
+              {% if bar.is_booking %}
+                <{% if can_edit %}a href="{% url 'planning:booking_edit' item.pk %}"{% else %}span{% endif %} class="bar {{ item.status }}{% if bar.clipped_before %} clip-before{% endif %}{% if bar.clipped_after %} clip-after{% endif %}" style="grid-column: {{ bar.first|add:3 }} / {{ bar.last|add:4 }}" title="{{ item.project_no }} · {{ item.weeks_text }} · {{ item.get_status_display }}"></{% if can_edit %}a{% else %}span{% endif %}>
+              {% else %}
+                <{% if can_edit %}a href="{% url 'planning:block_edit' item.pk %}"{% else %}span{% endif %} class="bar block{% if bar.clipped_before %} clip-before{% endif %}{% if bar.clipped_after %} clip-after{% endif %}" style="grid-column: {{ bar.first|add:3 }} / {{ bar.last|add:4 }}" title="{{ item.get_kind_display }} · {{ item.weeks_text }}"></{% if can_edit %}a{% else %}span{% endif %}>
+              {% endif %}
+            </div>
+          {% endwith %}
+        {% empty %}
+          <div class="plan-row">
+            <div class="label empty" style="grid-column: 1 / 4">Nothing planned in {{ year }}</div>
+            <div class="weeks-bg"></div>
+            {% if current_week %}<div class="now" style="grid-column: {{ current_week|add:3 }}"></div>{% endif %}
+          </div>
+        {% endfor %}
+      {% empty %}
+        <p class="alert">No test units yet: an administrator adds them in the admin.</p>
+      {% endfor %}
+    </div>
+  </div>
+  <p class="hint">Rough planning by ISO week: never printed on a TCN or report. A unit holds one project or block at a time; Cancelled bookings free it.</p>
+{% endblock %}

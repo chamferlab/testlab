@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · TestLab{% endblock %}
+{% block main_class %}narrow{% endblock %}
+{% block breadcrumbs %}
+  <nav class="breadcrumbs"><a href="{% url 'planning:plan' %}">Lab plan</a> › {{ title }}</nav>
+{% endblock %}
+{% block content %}
+  <div class="page-head">
+    <h1>{{ title }}</h1>
+    {% if item.pk %}<p class="meta">{{ item.weeks_text }} · {{ item.start|date:"j M Y" }} – {{ item.end|date:"j M Y" }}</p>{% endif %}
+  </div>
+  <form method="post" class="fields card">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<ul class="errorlist nonfield">{% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+    {% for field in form %}
+      <div class="field">
+        {{ field.label_tag }}
+        {{ field }}
+        {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+        {{ field.errors }}
+      </div>
+    {% endfor %}
+    <p class="hint">Weeks are ISO weeks: from the Monday of the first week to the Sunday of the last.</p>
+    <div class="actions">
+      <button type="submit" class="btn-primary">Save</button>
+      <a class="button btn-ghost" href="{% url 'planning:plan' %}{% if item.pk %}?year={{ item.start|date:'o' }}{% endif %}">Cancel</a>
+    </div>
+  </form>
+  {% if delete_url %}
+    <form method="post" action="{{ delete_url }}" class="actions" onsubmit="return confirm('{% if kind == 'booking' %}Delete the booking of {{ item.project_no|escapejs }} ({{ item.weeks_text }})? To keep it on the plan, set it to Cancelled instead.{% else %}Delete this {{ item.get_kind_display|lower }} ({{ item.weeks_text }})?{% endif %}');">
+      {% csrf_token %}
+      <button type="submit" class="btn-danger">Delete</button>
+    </form>
+  {% endif %}
+{% endblock %}

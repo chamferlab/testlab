@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "testlab.execution",
     "testlab.results",
     "testlab.reports",
+    "testlab.planning",
 ]
 
 MIDDLEWARE = [

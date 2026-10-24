@@ -319,6 +319,16 @@ What works today:
   "Prepared by" from the Result's responsible engineer, and places events
   and observations in the body, the manual log in Annex A, and a cumulative
   collected-volume chart (markers at the collection times only).
+- **Lab plan** — *Lab plan* in the top bar: which test unit (A–D, managed
+  in the admin) is booked by which project in which ISO weeks, one row per
+  booking under its unit, as on the lab's yearly slide. A booking holds
+  project no., description and PE(s) as free text (the project need not
+  exist in TestLab yet; the plan links to it once it does), unit, first and
+  last week, and status (Tentative, Confirmed, Done, Cancelled). Units can
+  also be blocked (maintenance, rebuild, calibration, reserved). A unit
+  holds one booking or block at a time (refused, naming the other one;
+  Cancelled bookings excepted); one booking per project. Rough planning:
+  never tied to a TCN, printed in a document or frozen. From 2026 on.
 
 Out of M1: legacy Excel import, Test Programs, Results, Summaries, Final
 Reports, DCS/LabVIEW data.
@@ -508,6 +518,11 @@ app/
     │   ├── assembly.py         summary table and run sections from the frozen records; draft PDF
     │   ├── slides.py           the included runs as PowerPoint slides (python-pptx), never stored
     │   └── forms.py, views.py, urls.py, templates/reports/, tests/
+    ├── planning/               Lab plan: test units, bookings and unit blocks by ISO week
+    │   ├── weeks.py            ISO week ↔ date, week choices
+    │   ├── models.py           TestUnit, Booking, UnitBlock; one booking or block per unit at a time
+    │   ├── plan.py             a year's bars per unit
+    │   └── forms.py, views.py, urls.py, templates/planning/, tests/
     └── documents/
         ├── tcn_context.py      TCN render context: labels, units, NA rule, column sets
         ├── tcn_context.py / run_report_context.py   render contexts (plain data; the report one is the final snapshot)

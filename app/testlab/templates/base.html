@@ -14,7 +14,8 @@
     <a class="brand" href="{% url 'home' %}">TestLab</a>
     {% if user.is_authenticated %}
       {% with section=request.resolver_match.app_name %}
-        <nav><a href="{% url 'projects:list' %}"{% if section == "projects" or section == "tcn" %} class="active"{% endif %}>Projects</a></nav>
+        <nav><a href="{% url 'projects:list' %}"{% if section == "projects" or section == "tcn" %} class="active"{% endif %}>Projects</a>
+          <a href="{% url 'planning:plan' %}"{% if section == "planning" %} class="active"{% endif %}>Lab plan</a></nav>
       {% endwith %}
       <div class="user">
         <span>{{ user.get_full_name|default:user.username }}</span>

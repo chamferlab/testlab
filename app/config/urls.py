@@ -9,6 +9,7 @@ urlpatterns = [
     path("", include("testlab.execution.urls")),
     path("", include("testlab.results.urls")),
     path("", include("testlab.reports.urls")),
+    path("planning/", include("testlab.planning.urls")),
     path("accounts/", include("testlab.accounts.urls")),
     path("accounts/", include("django.contrib.auth.urls")),
     # Admin: user management and approval of registered accounts (superusers).

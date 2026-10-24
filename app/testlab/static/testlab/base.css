@@ -679,3 +679,51 @@ td.imported .import-mark { margin-left: 4px; text-decoration: none; color: var(-
 .drawing-card .drawing-history ul { margin: 6px 0 0; padding-left: 18px; }
 .drawing-card form.upload { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 10px; }
 .drawing-card form.upload h4 { margin: 0 0 6px; }
+
+/* ---- Lab plan: one grid per row, one column per ISO week ----------------- */
+
+.plan-years { display: flex; gap: 2px; }
+.plan-years a { padding: 3px 9px; border-radius: var(--radius-sm); color: var(--text-muted); text-decoration: none; font-weight: 500; }
+.plan-years a:hover { background: var(--accent-soft); color: var(--text); }
+.plan-years a.active { background: var(--accent-soft); color: var(--accent); }
+.plan-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; font-size: 13px; color: var(--text-muted); }
+.plan-legend .swatch { display: inline-block; width: 22px; height: 11px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.plan-legend .swatch.now { background: var(--warning-bg); border: 1px solid var(--warning-border); }
+
+.plan-scroll { overflow-x: auto; }
+.plan-legend, .lab-plan { --plan-green: #1f9d55; }
+.lab-plan { min-width: calc(30em + var(--weeks) * 22px); font-size: 13px; }
+.plan-row {
+  display: grid;
+  grid-template-columns: 8.5em minmax(10em, 16em) 9em repeat(var(--weeks), minmax(22px, 1fr));
+  min-height: 26px;
+  border-bottom: 1px solid var(--border);
+}
+.plan-row > * { grid-row: 1; min-width: 0; }
+.plan-row .label { padding: 4px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; align-self: center; }
+.plan-row .label.head { font-weight: 600; color: var(--text-muted); }
+.plan-months .month { text-align: center; font-weight: 600; padding: 4px 0; border-left: 1px solid var(--border-strong); }
+.plan-weeks { background: var(--surface-muted); }
+.plan-weeks .week-no { text-align: center; font-size: 10.5px; color: var(--text-muted); align-self: center; }
+.plan-weeks .week-no.now { color: var(--warning); font-weight: 700; }
+.plan-unit { background: #fbe3cc; }  /* the unit band of the lab's slide */
+.plan-unit .label { display: flex; gap: 10px; align-items: baseline; overflow: visible; }
+.plan-unit .plan-use { color: var(--text-muted); font-size: 12px; }
+.plan-unit .plan-add { margin-left: auto; font-size: 12px; position: relative; z-index: 1; }
+.weeks-bg {
+  grid-column: 4 / -1;
+  background-image: linear-gradient(to right, var(--border) 1px, transparent 1px);
+  background-size: calc(100% / var(--weeks)) 100%;
+}
+.plan-row .now { background: var(--warning-bg); opacity: 0.8; }
+.plan-row .bar, .plan-legend .swatch { background: var(--plan-green); }
+.plan-row .bar { margin: 4px 1px; border-radius: 2px; position: relative; }
+.plan-row a.bar:hover { outline: 2px solid var(--accent); }
+.bar.tentative, .swatch.tentative {
+  background: repeating-linear-gradient(135deg, var(--plan-green) 0 5px, #bfe5cd 5px 10px);
+}
+.bar.done, .swatch.done { background: #8fbfa0; }
+.bar.cancelled { background: transparent; border: 1px dashed var(--text-faint); }
+.bar.block, .swatch.block { background: repeating-linear-gradient(135deg, #8a929e 0 5px, #c9ced6 5px 10px); }
+.bar.clip-before { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: 0; }
+.bar.clip-after { border-top-right-radius: 0; border-bottom-right-radius: 0; margin-right: 0; }
