@@ -19,6 +19,7 @@
       {% endwith %}
       <div class="user">
         <span>{{ user.get_full_name|default:user.username }}</span>
+        <a href="{% url 'password_change' %}">Change password</a>
         <form method="post" action="{% url 'logout' %}">
           {% csrf_token %}
           <button type="submit" class="link">Log out</button>

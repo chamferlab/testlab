@@ -98,6 +98,9 @@ What works today:
   name, corporate email address and password; only the domains in
   `TESTLAB_ALLOWED_EMAIL_DOMAINS` may register. New accounts wait for an
   administrator to approve them (below). Users log in with their email address.
+  "Change password" in the top bar asks the current password and the new one
+  twice; the user stays logged in. A forgotten password is reset by an
+  administrator (Admin → Users → the user → Password).
 - **Manual log (M2A)** — "Log" on a register row opens the run's test
   execution pages. A reading has a date/time, the measurements of the run's
   configuration (speed, torque, Process with the Plug Seal, Barrier/Buffer/
