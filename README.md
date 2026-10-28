@@ -401,6 +401,29 @@ development server; stop it with Ctrl+C.
 - By default the server listens on 127.0.0.1 only. `--lan` listens on all interfaces and prints the addresses colleagues can use; it adds this machine's names to `TESTLAB_ALLOWED_HOSTS` unless that variable is set. Anyone on the network then reaches the login page — use it for testing only.
 - All `TESTLAB_*` environment variables are passed through unchanged.
 
+### Updating a machine where TestLab runs as an NSSM service
+
+From an administrator Command Prompt:
+
+```bat
+scripts\update.bat MyServiceName
+```
+
+Without a name it uses `TESTLAB_SERVICE`, or else `TestLab`.
+
+It checks first (administrator, `nssm` on the PATH, the service exists, no
+files edited on that machine) and changes nothing if a check fails. Then it
+stops the service, copies the SQLite database to
+`data\backups\testlab-<date>-<time>.sqlite3`, runs `git pull --ff-only`,
+runs setup (packages, Chromium, migrations) and starts the service again. If
+the pull fails, the service is started again on the old version; if setup
+fails, it stays stopped and the script prints how to go back (`git reset
+--hard <previous commit>`, copy the backup back). Updating by hand with `git
+pull` also needs a service restart: the development server reloads changed
+code by itself but does not apply migrations. Variables set only in the
+NSSM service (Environment tab) are not seen by the script, so it would back
+up the default database path.
+
 ### Troubleshooting
 
 - **Chromium download fails** (setup warning, or `testlab.W003` from `manage.py check`): behind HTTPS inspection the download needs the company root certificate. Ask IT for it as a PEM file and run `set NODE_EXTRA_CA_CERTS=C:\path\company-root.pem` (Linux: `export …`) before setup.
