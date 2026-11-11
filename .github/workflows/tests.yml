@@ -32,8 +32,16 @@ jobs:
         run: python -m pip install --disable-pip-version-check -e ".[dev]"
 
       # The tests marked `chromium` print real PDFs; without it they are skipped.
+      # Retried: the Linux runner's apt mirrors sometimes fail to resolve.
       - name: Install Chromium
-        run: python -m playwright install --with-deps chromium
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            python -m playwright install --with-deps chromium && exit 0
+            echo "Chromium install failed (attempt $attempt), retrying in 30 s..."
+            sleep 30
+          done
+          exit 1
 
       - name: Model changes without a migration
         run: python app/manage.py makemigrations --check --dry-run
