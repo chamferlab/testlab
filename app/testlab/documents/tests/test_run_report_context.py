@@ -459,3 +459,24 @@ def test_report_numbers_are_rounded_for_display_only():
     assert report_number(76.7472, "h") == "76.75" and report_number(-0.04, "barg") == "0.0"
     assert report_range(30.01, 29.98 + 0.06, "barg") == "30.0"  # both show the same: one value
     assert report_number(0.1234, "mm") == "0.1234"  # no rule for the unit: as recorded
+
+
+def test_unrecorded_stop_is_not_noted_when_another_recording_continues():
+    """An export imported mid-test ends with the shaft running; the complete recording records the stop."""
+    from datetime import datetime, timezone as tz
+    from types import SimpleNamespace
+
+    from testlab.documents.run_report_context import _edge_notes
+    from testlab.execution.running_intervals import CHANGE, RECORDING_END
+
+    t0 = datetime(2026, 10, 26, 9, 42, tzinfo=tz.utc)
+
+    def recording(name, end_h, end_at):
+        dataset = SimpleNamespace(original_name=name, recording_started_at=t0)
+        return SimpleNamespace(dataset=dataset, coverage=[[0.0, end_h]],
+                               intervals=[{"start_h": 1.0, "end_h": end_h, "start_at": CHANGE, "end_at": end_at}])
+
+    partial, complete = recording("partial", 5.6, RECORDING_END), recording("complete", 26.0, RECORDING_END)
+    notes = _edge_notes(SimpleNamespace(dcs={1: partial, 2: complete}))
+    assert notes == ["complete: the shaft was still running when the recording ended; the stop is not recorded"]
+    assert len(_edge_notes(SimpleNamespace(dcs={1: partial}))) == 1  # alone: the stop is not recorded

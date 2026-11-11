@@ -205,7 +205,7 @@ def qualifications(record, flags, threshold=None):
     if ident.get("running_provisional"):
         found["identification"].append("Provisional: the running intervals are not confirmed yet.")
     if not flags.get("running_basis_note"):
-        if ident.get("unknown_hours"):
+        if _float(ident.get("unknown_hours")):  # "0.00": seconds only, nothing worth stating
             found["identification"].append(f"{ident['unknown_hours']} h of the logged period have no evidence of "
                                            "the shaft state and are not counted as running.")  # fmt: skip
         for note in ident.get("running_notes", []):
@@ -245,6 +245,9 @@ def present(record, profile, stored=None, document=None):
     if ctx["document"].get("issued_at"):
         ctx["generated"] = ctx["document"]["issued_at"]
     ctx["qualifications"] = qualifications(record, flags)
+    ident = ctx.get("identification") or {}
+    if ident.get("unknown_hours") and not _float(ident["unknown_hours"]):
+        ident["unknown_hours"] = ""  # rounds to 0.00 h (records frozen before this was dropped at the source)
     slots = selection["slots"]
 
     def slot(component_id, kind):

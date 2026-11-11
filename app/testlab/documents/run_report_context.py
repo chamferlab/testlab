@@ -217,7 +217,7 @@ def _identification(test_run, tcn, setup, project, found):
                            "hours": _hours(_span_hours(a, b))} for a, b in spans],  # fmt: skip
         "running_provisional": bool(timeline.provisional),
         "stopped_hours": _hours(timeline.stopped_h) if timeline.known and timeline.stopped_h else "",
-        "unknown_hours": _hours(timeline.unknown_h) if timeline.known and timeline.unknown_h > 1e-6 else "",
+        "unknown_hours": _hours(timeline.unknown_h) if timeline.known and round(timeline.unknown_h, 2) else "",
         "running_sources": timeline.sources,
         "running_notes": timeline.notes + _edge_notes(timeline),
         "manual_threshold_rpm": f"{runtime.threshold_rpm():g}",
@@ -247,16 +247,37 @@ def _recording(dataset):
 
 
 def _edge_notes(timeline):
+    """A recording that starts or ends with the shaft running leaves that start or stop unrecorded, unless
+    another recording of the run covers the moment (e.g. an export imported mid-test beside the complete one)."""
+    states = list(timeline.dcs.values())
     notes = []
-    for found in timeline.dcs.values():
+    for found in states:
+        others = [s for s in states if s is not found]
         for interval in found.intervals:
-            if interval.get("start_at") == running_intervals.RECORDING_START:
+            if interval.get("start_at") == running_intervals.RECORDING_START and not _covered_by(
+                others, running_intervals.moment(found.dataset, interval["start_h"]), before=True
+            ):
                 notes.append(f"{found.dataset.original_name}: the shaft was already running when the recording "
                              "started; the start is not recorded")  # fmt: skip
-            if interval.get("end_at") == running_intervals.RECORDING_END:
+            if interval.get("end_at") == running_intervals.RECORDING_END and not _covered_by(
+                others, running_intervals.moment(found.dataset, interval["end_h"]), before=False
+            ):
                 notes.append(f"{found.dataset.original_name}: the shaft was still running when the recording "
                              "ended; the stop is not recorded")  # fmt: skip
     return notes
+
+
+def _covered_by(states, at, before):
+    """Whether another recording has samples on both sides of `at` (absolute time; None: unknown, not covered),
+    i.e. it records what happened just before a start or just after a stop."""
+    if at is None:
+        return False
+    for state in states:
+        for a, b in state.coverage:
+            start, end = (running_intervals.moment(state.dataset, h) for h in (a, b))
+            if start is not None and end is not None and (start < at <= end if before else start <= at < end):
+                return True
+    return False
 
 
 def _running(found):
