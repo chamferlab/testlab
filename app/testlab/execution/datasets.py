@@ -121,6 +121,38 @@ def import_dataset(test_run, uploaded, user):
         raise
 
 
+def deletion_refusal(dataset):
+    """Why an imported dataset cannot be deleted, or "" (e.g. a recording imported mid-test, later replaced
+    by the complete one). Refused while the Result is final, once a final revision holds it (it was evidence
+    when that revision was finalized), and while Result plots are made from it (remove those first)."""
+    from testlab import locks
+
+    if refusal := locks.result_refusal(dataset.test_run):
+        return refusal
+    from testlab.results.models import ResultRevision
+
+    finalized = ResultRevision.objects.filter(result__test_run=dataset.test_run, finalized_at__gte=dataset.imported_at)
+    if revision := finalized.order_by("-number").first():
+        return f"{dataset} is on record in final revision {revision.number} and cannot be deleted."
+    if count := dataset.result_plots.count():
+        plural = "s are" if count > 1 else " is"
+        them = "them" if count > 1 else "it"
+        return f"{count} Result plot{plural} made from {dataset}: remove {them} from the Result first."
+    return ""
+
+
+def delete_dataset(dataset):
+    """Delete an imported dataset: its running determinations, the record and its stored files."""
+    if refusal := deletion_refusal(dataset):
+        raise DatasetImportError(refusal)
+    storage = dataset.raw_file.storage
+    names = [n for n in (dataset.raw_file.name, dataset.columns_file) if n]
+    with transaction.atomic():
+        dataset.running_determinations.all().delete()
+        dataset.delete()
+        transaction.on_commit(lambda: [storage.delete(n) for n in names if storage.exists(n)])
+
+
 def load_columns(dataset):
     """All samples as one array("d") per column (time column in hours)."""
     storage = dataset.raw_file.storage

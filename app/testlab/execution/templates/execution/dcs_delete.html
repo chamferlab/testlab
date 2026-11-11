@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Delete {{ dataset.original_name }} · Run {{ run.display_no }} · {{ project.project_no }} · TestLab{% endblock %}
+{% block main_class %}narrow{% endblock %}
+{% block content %}
+  {% include "execution/_run_head.html" %}
+  <h2>Delete the DCS dataset {{ dataset.original_name }}?</h2>
+  <p class="hint">Imported {{ dataset.imported_at|date:"d-M-Y H:i" }} · {{ dataset.time_start_h|floatformat:3 }} – {{ dataset.time_end_h|floatformat:3 }} h ({{ dataset.duration_h|floatformat:2 }} h) · {{ dataset.sample_count }} samples</p>
+  {% if refusal %}
+    <p class="alert alert-danger">{{ refusal }}</p>
+    <div class="actions"><a class="button btn-ghost" href="{% url 'execution:dcs_detail' dataset.pk %}">Back</a></div>
+  {% else %}
+    <p class="notice">The imported file, its running intervals (detected, confirmed or entered) and the dataset are
+      removed. Running hours and t = 0 of the run are then found from the remaining recordings and the manual log.
+      Reports already issued keep what they showed. This cannot be undone.</p>
+    <form method="post">
+      {% csrf_token %}
+      <div class="actions">
+        <button type="submit" class="btn-danger-solid">Delete dataset</button>
+        <a class="button btn-ghost" href="{% url 'execution:dcs_detail' dataset.pk %}">Back</a>
+      </div>
+    </form>
+  {% endif %}
+{% endblock %}

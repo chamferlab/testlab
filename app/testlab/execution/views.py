@@ -195,6 +195,28 @@ def get_dataset(pk):
     return get_object_or_404(DcsDataset.objects.select_related("test_run__project", "imported_by"), pk=pk)
 
 
+class DcsDeleteView(View):
+    """Delete an imported dataset, e.g. a recording imported mid-test that the complete one replaces."""
+
+    template_name = "execution/dcs_delete.html"
+
+    def get(self, request, pk):
+        dataset = get_dataset(pk)
+        return render(request, self.template_name, {**run_context(dataset.test_run, "dcs"), "dataset": dataset,
+                                                    "refusal": datasets.deletion_refusal(dataset)})  # fmt: skip
+
+    def post(self, request, pk):
+        dataset = get_dataset(pk)
+        run_pk, name = dataset.test_run.pk, dataset.original_name
+        try:
+            datasets.delete_dataset(dataset)
+        except datasets.DatasetImportError as error:
+            messages.error(request, str(error))
+            return redirect("execution:dcs_detail", pk)
+        messages.success(request, f"DCS dataset {name} deleted.")
+        return redirect("execution:dcs", run_pk)
+
+
 class DcsDetailView(View):
     template_name = "execution/dcs_detail.html"
 

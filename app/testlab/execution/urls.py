@@ -20,4 +20,5 @@ urlpatterns = [
     path("dcs/<int:pk>/running/", views.DcsRunningView.as_view(), name="dcs_running"),
     path("dcs/<int:pk>/data/", views.DcsDataView.as_view(), name="dcs_data"),
     path("dcs/<int:pk>/raw/", views.DcsRawView.as_view(), name="dcs_raw"),
+    path("dcs/<int:pk>/delete/", views.DcsDeleteView.as_view(), name="dcs_delete"),
 ]

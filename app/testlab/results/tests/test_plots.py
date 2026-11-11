@@ -245,3 +245,36 @@ def test_result_summary_layout(logged_in, run, result, dataset):
 def test_project_page_links_to_the_run_result(logged_in, run):
     page = logged_in.get(reverse("projects:detail", args=[run.project.pk])).content.decode()
     assert f'href="{reverse("results:result", args=[run.pk])}"' in page and ">Result</a>" in page
+
+
+# --- deleting an imported dataset ------------------------------------------------------
+
+
+def test_dataset_imported_mid_test_can_be_deleted_with_its_files(logged_in, run, user):
+    from testlab.execution import running_intervals
+    from testlab.execution.models import DcsDataset
+
+    dataset = datasets.import_dataset(run, SimpleUploadedFile(NAME, export()), user)
+    running_intervals.ensure_current(dataset, user)
+    storage, names = dataset.raw_file.storage, [dataset.raw_file.name, dataset.columns_file]
+    url = reverse("execution:dcs_delete", args=[dataset.pk])
+    assert "Delete dataset" in logged_in.get(url).content.decode()
+    from django.test import TestCase
+
+    with TestCase.captureOnCommitCallbacks(execute=True):
+        response = logged_in.post(url)
+    assert response.url == reverse("execution:dcs", args=[run.pk])
+    assert not DcsDataset.objects.exists()
+    assert not any(storage.exists(name) for name in names)
+
+
+def test_dataset_with_result_plots_is_not_deleted(logged_in, result, dataset, user):
+    plots.add_plot(result, dataset, definition(), png(), user)
+    url = reverse("execution:dcs_delete", args=[dataset.pk])
+    page = logged_in.get(url).content.decode()
+    assert "1 Result plot is made from" in page and "Delete dataset" not in page
+    logged_in.post(url)
+    assert type(dataset).objects.filter(pk=dataset.pk).exists()
+    plots.delete_plot(dataset.result_plots.get())
+    logged_in.post(url)
+    assert not type(dataset).objects.filter(pk=dataset.pk).exists()
